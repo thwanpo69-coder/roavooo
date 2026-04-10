@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'wouter';
 import { motion } from 'framer-motion';
 import { Search as SearchIcon, MapPin, ArrowRight, Bed, Compass, Utensils } from 'lucide-react';
-import { PLACES } from '@/lib/data';
 import { PlaceCard } from '@/components/ui/PlaceCard';
 import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -29,12 +28,28 @@ type DbCity = {
   tip_phrases_fr: string;
 };
 
+type DbPlace = {
+  id: string;
+  city_id: string;
+  name: string;
+  category: 'stay' | 'activity' | 'restaurant';
+  description_en: string;
+  description_fr: string;
+  image_url: string;
+  location: string | null;
+  rating: number;
+  price_per_night: number | null;
+  price_range: string | null;
+  cuisine: string | null;
+};
+
 export function Home() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<'stay' | 'activity' | 'restaurant'>('stay');
   const [cities, setCities] = useState<DbCity[]>([]);
-  const { t} = useLanguage();
+  const [places, setPlaces] = useState<DbPlace[]>([]);
+  const { t } = useLanguage();
 
   useEffect(() => {
     supabase
@@ -54,6 +69,24 @@ export function Home() {
       });
   }, []);
 
+  useEffect(() => {
+    supabase
+      .from('places')
+      .select('*')
+      .order('id', { ascending: true })
+      .then(({ data, error }) => {
+        console.log('places:', data);
+        console.log('places error:', error);
+
+        if (error) {
+          console.error('Failed to fetch places:', error);
+          return;
+        }
+
+        setPlaces((data as DbPlace[]) || []);
+      });
+  }, []);
+
   const CATEGORIES = [
     { label: t.hero.tabs.stays, value: 'stay' as const, icon: Bed },
     { label: t.hero.tabs.experiences, value: 'activity' as const, icon: Compass },
@@ -68,9 +101,23 @@ export function Home() {
     setLocation(`/search?${params.toString()}`);
   };
 
-  const featuredStays = PLACES.filter((p) => p.category === 'stay').slice(0, 3);
-  const featuredActivities = PLACES.filter((p) => p.category === 'activity').slice(0, 3);
-  const featuredRestaurants = PLACES.filter((p) => p.category === 'restaurant').slice(0, 3);
+  const mappedPlaces = places.map((place) => ({
+    id: place.id,
+    cityId: place.city_id,
+    name: place.name,
+    category: place.category,
+    description: place.description_en,
+    imageUrl: place.image_url,
+    location: place.location ?? undefined,
+    rating: place.rating,
+    pricePerNight: place.price_per_night ?? undefined,
+    priceRange: place.price_range ?? undefined,
+    cuisine: place.cuisine ?? undefined,
+  }));
+
+  const featuredStays = mappedPlaces.filter((p) => p.category === 'stay').slice(0, 3);
+  const featuredActivities = mappedPlaces.filter((p) => p.category === 'activity').slice(0, 3);
+  const featuredRestaurants = mappedPlaces.filter((p) => p.category === 'restaurant').slice(0, 3);
 
   return (
     <div className="w-full">
@@ -114,14 +161,12 @@ export function Home() {
             {t.hero.subheadline}
           </motion.p>
 
-          {/* Search Card */}
           <motion.div
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.35 }}
             className="bg-card/95 backdrop-blur-xl rounded-2xl p-2 shadow-2xl border border-border/50"
           >
-            {/* Category Tabs */}
             <div className="flex border-b border-border/60 mb-2">
               {CATEGORIES.map(({ label, value, icon: Icon }) => (
                 <button
@@ -140,7 +185,6 @@ export function Home() {
               ))}
             </div>
 
-            {/* Search Row */}
             <form onSubmit={handleSearch} className="flex gap-2 p-1">
               <div className="relative flex-grow flex items-center">
                 <MapPin className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none" />

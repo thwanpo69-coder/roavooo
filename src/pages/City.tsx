@@ -1,31 +1,122 @@
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'wouter';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Info, Coffee, Bed, Activity as ActivityIcon } from 'lucide-react';
-import { CITIES, PLACES } from '@/lib/data';
 import { PlaceCard } from '@/components/ui/PlaceCard';
 import NotFound from './not-found';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { supabase } from '@/lib/supabase';
+
+type DbCity = {
+  id: string;
+  slug: string;
+  name: string;
+  image_url: string;
+  tagline_en: string;
+  tagline_fr: string;
+  description_en: string;
+  description_fr: string;
+  tip_best_time_en: string;
+  tip_best_time_fr: string;
+  tip_packing_en: string;
+  tip_packing_fr: string;
+  tip_etiquette_en: string;
+  tip_etiquette_fr: string;
+  tip_transport_en: string;
+  tip_transport_fr: string;
+  tip_phrases_en: string;
+  tip_phrases_fr: string;
+};
+
+type DbPlace = {
+  id: string;
+  city_id: string;
+  name: string;
+  category: 'stay' | 'activity' | 'restaurant';
+  description_en: string;
+  description_fr: string;
+  image_url: string;
+  location: string | null;
+  rating: number;
+  price_per_night: number | null;
+  price_range: string | null;
+  cuisine: string | null;
+};
 
 export function City() {
   const { slug } = useParams();
   const { t } = useLanguage();
-  const city = CITIES.find(c => c.slug === slug);
+  const [cities, setCities] = useState<DbCity[]>([]);
+  const [places, setPlaces] = useState<DbPlace[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('cities').select('*').order('id', { ascending: true }),
+      supabase.from('places').select('*').order('id', { ascending: true }),
+    ]).then(([citiesRes, placesRes]) => {
+      if (citiesRes.error) {
+        console.error('Failed to fetch cities:', citiesRes.error);
+      } else {
+        setCities((citiesRes.data as DbCity[]) || []);
+      }
+
+      if (placesRes.error) {
+        console.error('Failed to fetch places:', placesRes.error);
+      } else {
+        setPlaces((placesRes.data as DbPlace[]) || []);
+      }
+
+      setLoading(false);
+    });
+  }, []);
+
+  const city = cities.find((c) => c.slug === slug);
+
+  if (loading) {
+    return <div className="w-full min-h-screen bg-background" />;
+  }
 
   if (!city) return <NotFound />;
 
-  const cityPlaces = PLACES.filter(p => p.cityId === city.id);
-  const stays = cityPlaces.filter(p => p.category === 'stay');
-  const activities = cityPlaces.filter(p => p.category === 'activity');
-  const restaurants = cityPlaces.filter(p => p.category === 'restaurant');
+  const mappedPlaces = places.map((place) => ({
+    id: place.id,
+    cityId: place.city_id,
+    name: place.name,
+    category: place.category,
+    description: place.description_en,
+    imageUrl: place.image_url,
+    location: place.location ?? undefined,
+    rating: place.rating,
+    pricePerNight: place.price_per_night ?? undefined,
+    priceRange: place.price_range ?? undefined,
+    cuisine: place.cuisine ?? undefined,
+  }));
 
-  const cityContent = t.city.content[city.slug as keyof typeof t.city.content];
+  const cityPlaces = mappedPlaces.filter((p) => p.cityId === city.id);
+  const stays = cityPlaces.filter((p) => p.category === 'stay');
+  const activities = cityPlaces.filter((p) => p.category === 'activity');
+  const restaurants = cityPlaces.filter((p) => p.category === 'restaurant');
+
+  const cityContent = t.city.content?.[city.slug as keyof typeof t.city.content];
+
+  const tagline = cityContent?.tagline ?? city.tagline_en;
+  const description = cityContent?.description ?? city.description_en;
+
+  const tips = {
+    bestTime: cityContent?.tips?.bestTime ?? city.tip_best_time_en,
+    packing: cityContent?.tips?.packing ?? city.tip_packing_en,
+    etiquette: cityContent?.tips?.etiquette ?? city.tip_etiquette_en,
+    transport: cityContent?.tips?.transport ?? city.tip_transport_en,
+    phrases: cityContent?.tips?.phrases ?? city.tip_phrases_en,
+  };
 
   return (
     <div className="w-full bg-background pb-24">
       <div className="relative h-[60vh] min-h-[400px]">
         <div className="absolute inset-0">
-          <img src={city.imageUrl} alt={city.name} className="w-full h-full object-cover" />
+          <img src={city.image_url} alt={city.name} className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/40"></div>
         </div>
 
@@ -51,7 +142,7 @@ export function City() {
             transition={{ delay: 0.1 }}
             className="text-xl md:text-2xl text-white/90 max-w-2xl font-light"
           >
-            {cityContent.tagline}
+            {tagline}
           </motion.p>
         </div>
       </div>
@@ -61,9 +152,7 @@ export function City() {
           <h2 className="text-2xl font-serif font-bold mb-4">
             {t.city.about} {city.name}
           </h2>
-          <p className="text-muted-foreground text-lg leading-relaxed">
-            {cityContent.description}
-          </p>
+          <p className="text-muted-foreground text-lg leading-relaxed">{description}</p>
         </div>
 
         <Tabs defaultValue="stays" className="w-full">
@@ -99,19 +188,25 @@ export function City() {
 
           <TabsContent value="stays" className="space-y-8 animate-in fade-in duration-500">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {stays.map(place => <PlaceCard key={place.id} place={place} />)}
+              {stays.map((place) => (
+                <PlaceCard key={place.id} place={place} />
+              ))}
             </div>
           </TabsContent>
 
           <TabsContent value="activities" className="space-y-8 animate-in fade-in duration-500">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {activities.map(place => <PlaceCard key={place.id} place={place} />)}
+              {activities.map((place) => (
+                <PlaceCard key={place.id} place={place} />
+              ))}
             </div>
           </TabsContent>
 
           <TabsContent value="restaurants" className="space-y-8 animate-in fade-in duration-500">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {restaurants.map(place => <PlaceCard key={place.id} place={place} />)}
+              {restaurants.map((place) => (
+                <PlaceCard key={place.id} place={place} />
+              ))}
             </div>
           </TabsContent>
 
@@ -121,35 +216,35 @@ export function City() {
                 <h3 className="font-serif text-xl font-bold mb-4 flex items-center gap-2">
                   <Info className="text-primary" /> {t.city.tips.bestTime}
                 </h3>
-                <p className="text-muted-foreground">{cityContent.tips.bestTime}</p>
+                <p className="text-muted-foreground">{tips.bestTime}</p>
               </div>
 
               <div className="bg-muted/30 p-8 rounded-2xl border border-border">
                 <h3 className="font-serif text-xl font-bold mb-4 flex items-center gap-2">
                   <Info className="text-primary" /> {t.city.tips.packing}
                 </h3>
-                <p className="text-muted-foreground">{cityContent.tips.packing}</p>
+                <p className="text-muted-foreground">{tips.packing}</p>
               </div>
 
               <div className="bg-muted/30 p-8 rounded-2xl border border-border">
                 <h3 className="font-serif text-xl font-bold mb-4 flex items-center gap-2">
                   <Info className="text-primary" /> {t.city.tips.etiquette}
                 </h3>
-                <p className="text-muted-foreground">{cityContent.tips.etiquette}</p>
+                <p className="text-muted-foreground">{tips.etiquette}</p>
               </div>
 
               <div className="bg-muted/30 p-8 rounded-2xl border border-border">
                 <h3 className="font-serif text-xl font-bold mb-4 flex items-center gap-2">
                   <Info className="text-primary" /> {t.city.tips.transport}
                 </h3>
-                <p className="text-muted-foreground">{cityContent.tips.transport}</p>
+                <p className="text-muted-foreground">{tips.transport}</p>
               </div>
 
               <div className="bg-muted/30 p-8 rounded-2xl border border-border md:col-span-2">
                 <h3 className="font-serif text-xl font-bold mb-4 flex items-center gap-2">
                   <Info className="text-primary" /> {t.city.tips.phrases}
                 </h3>
-                <p className="text-muted-foreground">{cityContent.tips.phrases}</p>
+                <p className="text-muted-foreground">{tips.phrases}</p>
               </div>
             </div>
           </TabsContent>

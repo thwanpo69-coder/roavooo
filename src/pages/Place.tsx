@@ -1,33 +1,97 @@
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'wouter';
 import { MapPin, Star, Heart, ArrowLeft, Share2 } from 'lucide-react';
-import { PLACES, CITIES } from '@/lib/data';
 import { useFavorites } from '@/hooks/use-favorites';
 import { Button } from '@/components/ui/button';
 import NotFound from './not-found';
 import { PlaceCard } from '@/components/ui/PlaceCard';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { supabase } from '@/lib/supabase';
+
+type DbCity = {
+  id: string;
+  slug: string;
+  name: string;
+  image_url: string;
+};
+
+type DbPlace = {
+  id: string;
+  city_id: string;
+  name: string;
+  category: 'stay' | 'activity' | 'restaurant';
+  description_en: string;
+  description_fr: string;
+  image_url: string;
+  location: string | null;
+  rating: number;
+  price_per_night: number | null;
+  price_range: string | null;
+  cuisine: string | null;
+};
 
 export function Place() {
   const { id } = useParams();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { t } = useLanguage();
+  const [cities, setCities] = useState<DbCity[]>([]);
+  const [places, setPlaces] = useState<DbPlace[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const place = PLACES.find((p) => p.id === id);
+  useEffect(() => {
+    Promise.all([
+      supabase.from('cities').select('*').order('id', { ascending: true }),
+      supabase.from('places').select('*').order('id', { ascending: true }),
+    ]).then(([citiesRes, placesRes]) => {
+      if (citiesRes.error) {
+        console.error('Failed to fetch cities:', citiesRes.error);
+      } else {
+        setCities((citiesRes.data as DbCity[]) || []);
+      }
 
-  if (!place) return <NotFound />;
+      if (placesRes.error) {
+        console.error('Failed to fetch places:', placesRes.error);
+      } else {
+        setPlaces((placesRes.data as DbPlace[]) || []);
+      }
 
-  const city = CITIES.find((c) => c.id === place.cityId);
-  const isFav = isFavorite(place.id);
+      setLoading(false);
+    });
+  }, []);
 
-  const relatedPlaces = PLACES
-    .filter((p) => p.cityId === place.cityId && p.category === place.category && p.id !== place.id)
-    .slice(0, 3);
+  if (loading) {
+    return <div className="w-full min-h-screen bg-background" />;
+  }
 
-  const categoryLabel = t.place.categoryLabel[place.category] ?? place.category;
-  const categoryPlural = t.place.categoryPlural[place.category] ?? place.category;
+  const dbPlace = places.find((p) => p.id === id);
 
-  const translatedPlace = t.place.content?.[place.id as keyof typeof t.place.content];
-  const description = translatedPlace?.description ?? place.description;
+  if (!dbPlace) return <NotFound />;
+
+  const city = cities.find((c) => c.id === dbPlace.city_id);
+  const isFav = isFavorite(dbPlace.id);
+
+  const relatedPlaces = places
+    .filter((p) => p.city_id === dbPlace.city_id && p.category === dbPlace.category && p.id !== dbPlace.id)
+    .slice(0, 3)
+    .map((place) => ({
+      id: place.id,
+      cityId: place.city_id,
+      name: place.name,
+      category: place.category,
+      description: place.description_en,
+      imageUrl: place.image_url,
+      location: place.location ?? undefined,
+      rating: place.rating,
+      pricePerNight: place.price_per_night ?? undefined,
+      priceRange: place.price_range ?? undefined,
+      cuisine: place.cuisine ?? undefined,
+    }));
+
+  const categoryLabel = t.place.categoryLabel[dbPlace.category] ?? dbPlace.category;
+  const categoryPlural = t.place.categoryPlural[dbPlace.category] ?? dbPlace.category;
+
+  const translatedPlace = t.place.content?.[dbPlace.id as keyof typeof t.place.content];
+  const description = translatedPlace?.description ?? dbPlace.description_en;
   const details = translatedPlace?.details ?? [];
 
   return (
@@ -48,7 +112,7 @@ export function Place() {
             variant="outline"
             size="icon"
             className="rounded-full border-border"
-            onClick={() => toggleFavorite(place.id)}
+            onClick={() => toggleFavorite(dbPlace.id)}
           >
             <Heart className={`w-4 h-4 ${isFav ? 'fill-primary text-primary' : ''}`} />
           </Button>
@@ -58,11 +122,7 @@ export function Place() {
       <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-8 space-y-8">
           <div className="aspect-[16/9] md:aspect-[21/9] rounded-3xl overflow-hidden shadow-lg relative group">
-            <img
-              src={place.imageUrl}
-              alt={place.name}
-              className="w-full h-full object-cover"
-            />
+            <img src={dbPlace.image_url} alt={dbPlace.name} className="w-full h-full object-cover" />
             <div className="absolute top-4 left-4">
               <span className="px-4 py-2 bg-background/90 backdrop-blur-md text-xs font-semibold rounded-full uppercase tracking-wider text-primary shadow-sm">
                 {categoryLabel}
@@ -73,12 +133,12 @@ export function Place() {
           <div>
             <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
               <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground">
-                {place.name}
+                {dbPlace.name}
               </h1>
               <div className="flex flex-col items-end">
                 <div className="flex items-center gap-1.5 text-lg font-bold bg-muted px-3 py-1.5 rounded-lg">
                   <Star className="w-5 h-5 fill-accent text-accent" />
-                  <span>{place.rating}</span>
+                  <span>{dbPlace.rating}</span>
                 </div>
               </div>
             </div>
@@ -86,7 +146,8 @@ export function Place() {
             <div className="flex items-center gap-2 text-muted-foreground text-lg mb-8">
               <MapPin className="w-5 h-5 text-primary" />
               <span>
-                {place.location}, {city?.name}
+                {dbPlace.location}
+                {city?.name ? `, ${city.name}` : ''}
               </span>
             </div>
 
@@ -105,33 +166,33 @@ export function Place() {
         <div className="lg:col-span-4">
           <div className="sticky top-28 bg-card border border-border rounded-3xl p-8 shadow-xl">
             <div className="mb-6 pb-6 border-b border-border">
-              {place.pricePerNight && (
+              {dbPlace.price_per_night && (
                 <div>
-                  <span className="text-3xl font-bold text-foreground">${place.pricePerNight}</span>
+                  <span className="text-3xl font-bold text-foreground">${dbPlace.price_per_night}</span>
                   <span className="text-muted-foreground ml-2">{t.place.perNight}</span>
                 </div>
               )}
-              {place.priceRange && (
+
+              {dbPlace.price_range && (
                 <div className="flex justify-between items-center">
                   <span className="text-lg font-medium text-muted-foreground">{t.place.priceRange}</span>
-                  <span className="text-2xl font-bold text-primary">{place.priceRange}</span>
+                  <span className="text-2xl font-bold text-primary">{dbPlace.price_range}</span>
                 </div>
               )}
-              {place.cuisine && (
+
+              {dbPlace.cuisine && (
                 <div className="mt-4 flex justify-between items-center">
                   <span className="text-lg font-medium text-muted-foreground">{t.place.cuisine}</span>
-                  <span className="font-semibold">{place.cuisine}</span>
+                  <span className="font-semibold">{dbPlace.cuisine}</span>
                 </div>
               )}
             </div>
 
             <Button className="w-full py-6 text-lg rounded-xl mb-4 font-semibold shadow-md hover:shadow-lg transition-all">
-              {place.category === 'stay' ? t.place.checkAvailability : t.place.bookExperience}
+              {dbPlace.category === 'stay' ? t.place.checkAvailability : t.place.bookExperience}
             </Button>
 
-            <p className="text-center text-sm text-muted-foreground">
-              {t.place.noCharge}
-            </p>
+            <p className="text-center text-sm text-muted-foreground">{t.place.noCharge}</p>
 
             <div className="mt-8 pt-6 border-t border-border">
               <h4 className="font-serif font-bold text-lg mb-4">{t.place.highlights}</h4>
