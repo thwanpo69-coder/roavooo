@@ -16,6 +16,8 @@ import { AdminLogin } from "@/pages/AdminLogin";
 import { AdminDashboard } from "@/pages/AdminDashboard";
 import { AdminNewPlace } from "@/pages/AdminNewPlace";
 import { AdminEditPlace } from "@/pages/AdminEditPlace";
+import { AdminNewCity } from "@/pages/AdminNewCity";
+import { AdminEditCity } from "@/pages/AdminEditCity";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -40,6 +42,9 @@ function AppShell() {
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/places/new" component={AdminNewPlace} />
           <Route path="/admin/places/:id/edit" component={AdminEditPlace} />
+          <Route path="/admin/cities/new" component={AdminNewCity} />
+          <Route path="/admin/cities/:id/edit" component={AdminEditCity} />
+
           <Route component={NotFound} />
         </Switch>
       </main>
