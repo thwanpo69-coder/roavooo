@@ -12,6 +12,8 @@ import { City } from "@/pages/City";
 import { Place } from "@/pages/Place";
 import { Favorites } from "@/pages/Favorites";
 import { Search } from "@/pages/Search";
+import { Login } from "@/pages/LoginPage";
+import { Signup } from "@/pages/SignupPage";
 import { AdminLogin } from "@/pages/AdminLogin";
 import { AdminDashboard } from "@/pages/AdminDashboard";
 import { AdminNewPlace } from "@/pages/AdminNewPlace";
@@ -37,6 +39,8 @@ function AppShell() {
           <Route path="/place/:id" component={Place} />
           <Route path="/favorites" component={Favorites} />
           <Route path="/search" component={Search} />
+          <Route path="/login" component={Login} />
+          <Route path="/signup" component={Signup} />
 
           <Route path="/admin/login" component={AdminLogin} />
           <Route path="/admin" component={AdminDashboard} />

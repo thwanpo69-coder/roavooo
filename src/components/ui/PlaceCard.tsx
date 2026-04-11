@@ -9,7 +9,7 @@ interface PlaceCardProps {
 }
 
 export function PlaceCard({ place }: PlaceCardProps) {
-  const { isFavorite, toggleFavorite } = useFavorites();
+  const { isFavorite, toggleFavorite, loading } = useFavorites();
   const { t } = useLanguage();
   const isFav = isFavorite(place.id);
 
@@ -37,15 +37,16 @@ export function PlaceCard({ place }: PlaceCardProps) {
         </div>
 
         <button
-          onClick={(e) => {
+          onClick={async (e) => {
             e.preventDefault();
-            toggleFavorite(place.id);
+            await toggleFavorite(place.id);
           }}
+          disabled={loading}
           className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all duration-200 z-10 ${
             isFav
               ? 'bg-primary/20 border border-primary/40'
               : 'bg-black/40 border border-white/20 hover:bg-black/60'
-          }`}
+          } ${loading ? 'opacity-60 cursor-not-allowed' : ''}`}
           aria-label={isFav ? 'Remove from favorites' : 'Add to favorites'}
         >
           <Heart
