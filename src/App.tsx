@@ -20,6 +20,8 @@ import { AdminNewPlace } from "@/pages/AdminNewPlace";
 import { AdminEditPlace } from "@/pages/AdminEditPlace";
 import { AdminNewCity } from "@/pages/AdminNewCity";
 import { AdminEditCity } from "@/pages/AdminEditCity";
+import { Trips } from "@/pages/Trips";
+import { TripDetails } from "@/pages/TripDetails";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -48,6 +50,8 @@ function AppShell() {
           <Route path="/admin/places/:id/edit" component={AdminEditPlace} />
           <Route path="/admin/cities/new" component={AdminNewCity} />
           <Route path="/admin/cities/:id/edit" component={AdminEditCity} />
+          <Route path="/trips" component={Trips} />
+          <Route path="/trips/:id" component={TripDetails} />
 
           <Route component={NotFound} />
         </Switch>

@@ -1,12 +1,21 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'wouter';
-import { MapPin, Star, Heart, ArrowLeft, Share2 } from 'lucide-react';
-import { useFavorites } from '@/hooks/use-favorites';
-import { Button } from '@/components/ui/button';
-import NotFound from './not-found';
-import { PlaceCard } from '@/components/ui/PlaceCard';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useState } from "react";
+import { useParams, Link } from "wouter";
+import {
+  MapPin,
+  Star,
+  Heart,
+  ArrowLeft,
+  Share2,
+  FolderPlus,
+  Check,
+  X,
+} from "lucide-react";
+import { useFavorites } from "@/hooks/use-favorites";
+import { Button } from "@/components/ui/button";
+import NotFound from "./not-found";
+import { PlaceCard } from "@/components/ui/PlaceCard";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { supabase } from "@/lib/supabase";
 
 type DbCity = {
   id: string;
@@ -19,7 +28,7 @@ type DbPlace = {
   id: string;
   city_id: string;
   name: string;
-  category: 'stay' | 'activity' | 'restaurant';
+  category: "stay" | "activity" | "restaurant";
   description_en: string;
   description_fr: string;
   image_url: string;
@@ -30,34 +39,114 @@ type DbPlace = {
   cuisine: string | null;
 };
 
+type Trip = {
+  id: string;
+  title: string;
+};
+
 export function Place() {
   const { id } = useParams();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { t } = useLanguage();
+
   const [cities, setCities] = useState<DbCity[]>([]);
   const [places, setPlaces] = useState<DbPlace[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [userTrips, setUserTrips] = useState<Trip[]>([]);
+  const [savingToTrip, setSavingToTrip] = useState(false);
+  const [showTripPicker, setShowTripPicker] = useState(false);
+
   useEffect(() => {
-    Promise.all([
-      supabase.from('cities').select('*').order('id', { ascending: true }),
-      supabase.from('places').select('*').order('id', { ascending: true }),
-    ]).then(([citiesRes, placesRes]) => {
+    const fetchData = async () => {
+      const [citiesRes, placesRes] = await Promise.all([
+        supabase.from("cities").select("*").order("id", { ascending: true }),
+        supabase.from("places").select("*").order("id", { ascending: true }),
+      ]);
+
       if (citiesRes.error) {
-        console.error('Failed to fetch cities:', citiesRes.error);
+        console.error("Failed to fetch cities:", citiesRes.error);
       } else {
         setCities((citiesRes.data as DbCity[]) || []);
       }
 
       if (placesRes.error) {
-        console.error('Failed to fetch places:', placesRes.error);
+        console.error("Failed to fetch places:", placesRes.error);
       } else {
         setPlaces((placesRes.data as DbPlace[]) || []);
       }
 
       setLoading(false);
-    });
+    };
+
+    fetchData();
   }, []);
+
+  const fetchUserTrips = async () => {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+
+    if (userError) {
+      console.error("Failed to get user:", userError);
+      alert("Could not get user.");
+      return;
+    }
+
+    const user = userData.user;
+
+    if (!user) {
+      alert("You must be logged in to save a place to a trip.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("trips")
+      .select("id, title")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Failed to fetch trips:", error);
+      alert("Could not load your trips.");
+      return;
+    }
+
+    setUserTrips((data as Trip[]) || []);
+    setShowTripPicker(true);
+  };
+
+  const handleSaveToTrip = async (tripId: string) => {
+    if (!id) return;
+
+    setSavingToTrip(true);
+
+    const { error } = await supabase.from("trip_places").insert({
+      trip_id: tripId,
+      place_id: id,
+    });
+
+    if (error) {
+      console.error("Failed to save place to trip:", error);
+
+      const message = error.message.toLowerCase();
+
+      if (
+        message.includes("duplicate") ||
+        message.includes("unique") ||
+        message.includes("trip_places_trip_id_place_id_key")
+      ) {
+        alert("This place is already in that trip.");
+      } else {
+        alert("Could not save this place to the trip.");
+      }
+
+      setSavingToTrip(false);
+      return;
+    }
+
+    alert("Place added to trip successfully.");
+    setSavingToTrip(false);
+    setShowTripPicker(false);
+  };
 
   if (loading) {
     return <div className="w-full min-h-screen bg-background" />;
@@ -71,7 +160,12 @@ export function Place() {
   const isFav = isFavorite(dbPlace.id);
 
   const relatedPlaces = places
-    .filter((p) => p.city_id === dbPlace.city_id && p.category === dbPlace.category && p.id !== dbPlace.id)
+    .filter(
+      (p) =>
+        p.city_id === dbPlace.city_id &&
+        p.category === dbPlace.category &&
+        p.id !== dbPlace.id
+    )
     .slice(0, 3)
     .map((place) => ({
       id: place.id,
@@ -87,10 +181,13 @@ export function Place() {
       cuisine: place.cuisine ?? undefined,
     }));
 
-  const categoryLabel = t.place.categoryLabel[dbPlace.category] ?? dbPlace.category;
-  const categoryPlural = t.place.categoryPlural[dbPlace.category] ?? dbPlace.category;
+  const categoryLabel =
+    t.place.categoryLabel[dbPlace.category] ?? dbPlace.category;
+  const categoryPlural =
+    t.place.categoryPlural[dbPlace.category] ?? dbPlace.category;
 
-  const translatedPlace = t.place.content?.[dbPlace.id as keyof typeof t.place.content];
+  const translatedPlace =
+    t.place.content?.[dbPlace.id as keyof typeof t.place.content];
   const description = translatedPlace?.description ?? dbPlace.description_en;
   const details = translatedPlace?.details ?? [];
 
@@ -108,13 +205,16 @@ export function Place() {
           <Button variant="outline" size="icon" className="rounded-full">
             <Share2 className="w-4 h-4" />
           </Button>
+
           <Button
             variant="outline"
             size="icon"
             className="rounded-full border-border"
             onClick={() => toggleFavorite(dbPlace.id)}
           >
-            <Heart className={`w-4 h-4 ${isFav ? 'fill-primary text-primary' : ''}`} />
+            <Heart
+              className={`w-4 h-4 ${isFav ? "fill-primary text-primary" : ""}`}
+            />
           </Button>
         </div>
       </div>
@@ -122,7 +222,11 @@ export function Place() {
       <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-8 space-y-8">
           <div className="aspect-[16/9] md:aspect-[21/9] rounded-3xl overflow-hidden shadow-lg relative group">
-            <img src={dbPlace.image_url} alt={dbPlace.name} className="w-full h-full object-cover" />
+            <img
+              src={dbPlace.image_url}
+              alt={dbPlace.name}
+              className="w-full h-full object-cover"
+            />
             <div className="absolute top-4 left-4">
               <span className="px-4 py-2 bg-background/90 backdrop-blur-md text-xs font-semibold rounded-full uppercase tracking-wider text-primary shadow-sm">
                 {categoryLabel}
@@ -135,6 +239,7 @@ export function Place() {
               <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground">
                 {dbPlace.name}
               </h1>
+
               <div className="flex flex-col items-end">
                 <div className="flex items-center gap-1.5 text-lg font-bold bg-muted px-3 py-1.5 rounded-lg">
                   <Star className="w-5 h-5 fill-accent text-accent" />
@@ -147,7 +252,7 @@ export function Place() {
               <MapPin className="w-5 h-5 text-primary" />
               <span>
                 {dbPlace.location}
-                {city?.name ? `, ${city.name}` : ''}
+                {city?.name ? `, ${city.name}` : ""}
               </span>
             </div>
 
@@ -168,38 +273,100 @@ export function Place() {
             <div className="mb-6 pb-6 border-b border-border">
               {dbPlace.price_per_night && (
                 <div>
-                  <span className="text-3xl font-bold text-foreground">${dbPlace.price_per_night}</span>
-                  <span className="text-muted-foreground ml-2">{t.place.perNight}</span>
+                  <span className="text-3xl font-bold text-foreground">
+                    ${dbPlace.price_per_night}
+                  </span>
+                  <span className="text-muted-foreground ml-2">
+                    {t.place.perNight}
+                  </span>
                 </div>
               )}
 
               {dbPlace.price_range && (
                 <div className="flex justify-between items-center">
-                  <span className="text-lg font-medium text-muted-foreground">{t.place.priceRange}</span>
-                  <span className="text-2xl font-bold text-primary">{dbPlace.price_range}</span>
+                  <span className="text-lg font-medium text-muted-foreground">
+                    {t.place.priceRange}
+                  </span>
+                  <span className="text-2xl font-bold text-primary">
+                    {dbPlace.price_range}
+                  </span>
                 </div>
               )}
 
               {dbPlace.cuisine && (
                 <div className="mt-4 flex justify-between items-center">
-                  <span className="text-lg font-medium text-muted-foreground">{t.place.cuisine}</span>
+                  <span className="text-lg font-medium text-muted-foreground">
+                    {t.place.cuisine}
+                  </span>
                   <span className="font-semibold">{dbPlace.cuisine}</span>
                 </div>
               )}
             </div>
 
             <Button className="w-full py-6 text-lg rounded-xl mb-4 font-semibold shadow-md hover:shadow-lg transition-all">
-              {dbPlace.category === 'stay' ? t.place.checkAvailability : t.place.bookExperience}
+              {dbPlace.category === "stay"
+                ? t.place.checkAvailability
+                : t.place.bookExperience}
             </Button>
 
-            <p className="text-center text-sm text-muted-foreground">{t.place.noCharge}</p>
+            <Button
+              variant="outline"
+              onClick={fetchUserTrips}
+              className="w-full py-6 text-lg rounded-xl mb-4 font-semibold"
+            >
+              <FolderPlus className="w-5 h-5 mr-2" />
+              Save to Trip
+            </Button>
+
+            {showTripPicker && (
+              <div className="mt-4 border border-border rounded-2xl p-4 bg-background/50">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold">Choose a trip</h4>
+
+                  <button
+                    onClick={() => setShowTripPicker(false)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    type="button"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {userTrips.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    You do not have any trips yet. Create one first.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {userTrips.map((trip) => (
+                      <button
+                        key={trip.id}
+                        onClick={() => handleSaveToTrip(trip.id)}
+                        disabled={savingToTrip}
+                        className="w-full text-left px-4 py-3 rounded-xl border border-border hover:bg-muted transition-colors disabled:opacity-60"
+                        type="button"
+                      >
+                        {trip.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <p className="text-center text-sm text-muted-foreground">
+              {t.place.noCharge}
+            </p>
 
             <div className="mt-8 pt-6 border-t border-border">
-              <h4 className="font-serif font-bold text-lg mb-4">{t.place.highlights}</h4>
+              <h4 className="font-serif font-bold text-lg mb-4">
+                {t.place.highlights}
+              </h4>
               <ul className="space-y-3 text-muted-foreground">
                 {t.place.highlightsList.map((item, i) => (
                   <li key={i} className="flex items-center gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary" /> {item}
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />{" "}
+                    {item}
                   </li>
                 ))}
               </ul>

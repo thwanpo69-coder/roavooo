@@ -37,6 +37,10 @@ export function Login() {
           Log in
         </h1>
 
+        <p className="text-sm text-muted-foreground">
+          Access your favorites and start building your travel plans.
+        </p>
+
         <input
           type="email"
           placeholder="Email"

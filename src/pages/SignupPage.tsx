@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 
 export function Signup() {
   const [, setLocation] = useLocation();
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -12,24 +13,43 @@ export function Signup() {
     e.preventDefault();
     setLoading(true);
 
+    const cleanUsername = username.trim();
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          username: cleanUsername,
+        },
+      },
     });
 
-    setLoading(false);
-
     if (error) {
+      setLoading(false);
       alert(error.message);
       return;
     }
+
+    if (data.user) {
+      const { error: profileError } = await supabase.from("profiles").insert({
+        id: data.user.id,
+        username: cleanUsername,
+        email,
+      });
+
+      if (profileError) {
+        console.error(profileError);
+      }
+    }
+
+    setLoading(false);
 
     if (data.session) {
       setLocation("/favorites");
       return;
     }
 
-    alert("Account created. You may need to confirm your email before logging in.");
     setLocation("/login");
   };
 
@@ -42,6 +62,19 @@ export function Signup() {
         <h1 className="text-3xl font-serif font-bold text-foreground">
           Sign up
         </h1>
+
+        <p className="text-sm text-muted-foreground">
+          Create an account to save favorites and plan your trips.
+        </p>
+
+        <input
+          type="text"
+          placeholder="Username"
+          className="w-full p-3 rounded-lg bg-muted"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+        />
 
         <input
           type="email"
@@ -64,7 +97,7 @@ export function Signup() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-primary text-white p-3 rounded-lg font-semibold"
+          className="w-full bg-primary text-white p-3 rounded-lg font-semibold disabled:opacity-60"
         >
           {loading ? "Loading..." : "Sign up"}
         </button>
