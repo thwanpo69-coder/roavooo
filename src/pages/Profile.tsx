@@ -12,6 +12,7 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  Camera,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -26,9 +27,18 @@ type FeedbackMessage = {
   text: string;
 } | null;
 
+type ProfileRow = {
+  id: string;
+  username: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  created_at: string;
+};
+
 export function Profile() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [stats, setStats] = useState<ProfileStats>({
     tripsCount: 0,
     favoritesCount: 0,
@@ -37,6 +47,7 @@ export function Profile() {
   const [editing, setEditing] = useState(false);
   const [username, setUsername] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackMessage>(null);
 
   const showFeedback = (type: "success" | "error", text: string) => {
@@ -70,12 +81,26 @@ export function Profile() {
       }
 
       setUser(currentUser);
-      setUsername(currentUser.user_metadata?.username || "");
 
-      const [tripsRes, favoritesRes] = await Promise.all([
+      const [profileRes, tripsRes, favoritesRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", currentUser.id)
+          .single(),
         supabase.from("trips").select("id").eq("user_id", currentUser.id),
         supabase.from("favorites").select("id").eq("user_id", currentUser.id),
       ]);
+
+      if (profileRes.error) {
+        console.error("Failed to fetch profile:", profileRes.error);
+      } else {
+        const profileData = profileRes.data as ProfileRow;
+        setProfile(profileData);
+        setUsername(
+          profileData.username || currentUser.user_metadata?.username || ""
+        );
+      }
 
       if (tripsRes.error) {
         console.error("Failed to fetch trips count:", tripsRes.error);
@@ -104,6 +129,8 @@ export function Profile() {
       return;
     }
 
+    if (!user) return;
+
     setSaving(true);
     setFeedback(null);
 
@@ -122,10 +149,12 @@ export function Profile() {
 
     const updatedUser = data.user;
 
-    const { error: profileError } = await supabase
+    const { data: updatedProfile, error: profileError } = await supabase
       .from("profiles")
       .update({ username: cleanUsername })
-      .eq("id", updatedUser.id);
+      .eq("id", updatedUser.id)
+      .select("*")
+      .single();
 
     if (profileError) {
       console.error("Failed to update username in profiles:", profileError);
@@ -141,6 +170,7 @@ export function Profile() {
     }
 
     setUser(updatedUser);
+    setProfile(updatedProfile as ProfileRow);
     setUsername(updatedUser?.user_metadata?.username || cleanUsername);
     setEditing(false);
     setSaving(false);
@@ -148,9 +178,73 @@ export function Profile() {
   };
 
   const handleCancelEdit = () => {
-    setUsername(user?.user_metadata?.username || "");
+    setUsername(profile?.username || user?.user_metadata?.username || "");
     setEditing(false);
     setFeedback(null);
+  };
+
+  const handleAvatarUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+
+    if (!file || !user) return;
+
+    const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      showFeedback("error", "Please upload a PNG, JPG, or WEBP image.");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      showFeedback("error", "Image must be smaller than 2MB.");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    setFeedback(null);
+
+    // One constant file path per user so old avatar gets overwritten
+    const filePath = `${user.id}/avatar`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, file, {
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("Failed to upload avatar:", uploadError);
+      showFeedback("error", "Could not upload avatar.");
+      setUploadingAvatar(false);
+      return;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("avatars")
+      .getPublicUrl(filePath);
+
+    const avatarUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
+
+    const { data: updatedProfile, error: profileError } = await supabase
+      .from("profiles")
+      .update({ avatar_url: avatarUrl })
+      .eq("id", user.id)
+      .select("*")
+      .single();
+
+    if (profileError) {
+      console.error("Failed to save avatar URL:", profileError);
+      showFeedback("error", "Avatar uploaded, but profile was not updated.");
+      setUploadingAvatar(false);
+      return;
+    }
+
+    setProfile(updatedProfile as ProfileRow);
+    setUploadingAvatar(false);
+    showFeedback("success", "Avatar updated successfully.");
+
+    e.target.value = "";
   };
 
   if (loading) {
@@ -184,7 +278,10 @@ export function Profile() {
   }
 
   const displayName =
-    user.user_metadata?.username || user.email?.split("@")[0] || "Traveler";
+    user.user_metadata?.username ||
+    profile?.username ||
+    user.email?.split("@")[0] ||
+    "Traveler";
 
   const joinedDate = user.created_at
     ? new Date(user.created_at).toLocaleDateString()
@@ -212,8 +309,35 @@ export function Profile() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <div className="rounded-3xl border border-border bg-card p-6">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-              <User className="w-10 h-10 text-primary" />
+            <div className="mb-5">
+              <label className="relative block w-20 h-20 cursor-pointer group">
+                {profile?.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={displayName}
+                    className="w-20 h-20 rounded-full object-cover border border-border"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+                    <User className="w-10 h-10 text-primary" />
+                  </div>
+                )}
+
+                <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Camera className="w-5 h-5 text-white" />
+                </div>
+
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+              </label>
+
+              <p className="text-xs text-muted-foreground mt-2">
+                {uploadingAvatar ? "Uploading..." : "Click avatar to change"}
+              </p>
             </div>
 
             {!editing ? (
