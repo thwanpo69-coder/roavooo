@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import {
   ArrowLeft,
@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Info,
   FolderOpen,
+  Image as ImageIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -38,7 +39,7 @@ type City = {
 type PlaceInfo = {
   id: string;
   name: string;
-  image_url: string;
+  image_url: string | null;
   rating: number;
   location: string | null;
   category: "stay" | "activity" | "restaurant";
@@ -92,6 +93,9 @@ export function TripDetails() {
 
   const [feedback, setFeedback] = useState<FeedbackMessage>(null);
 
+  const feedbackTimeoutRef = useRef<number | null>(null);
+  const savedNoteTimeoutRef = useRef<number | null>(null);
+
   const cityMap = useMemo(() => {
     return Object.fromEntries(cities.map((city) => [city.id, city]));
   }, [cities]);
@@ -108,19 +112,33 @@ export function TripDetails() {
     return places.filter((item) => (item.note || "").trim().length > 0).length;
   }, [places]);
 
+  const clearFeedbackTimer = () => {
+    if (feedbackTimeoutRef.current) {
+      window.clearTimeout(feedbackTimeoutRef.current);
+      feedbackTimeoutRef.current = null;
+    }
+  };
+
+  const clearSavedNoteTimer = () => {
+    if (savedNoteTimeoutRef.current) {
+      window.clearTimeout(savedNoteTimeoutRef.current);
+      savedNoteTimeoutRef.current = null;
+    }
+  };
+
   const showFeedback = (
     type: "success" | "error" | "info",
     text: string,
     autoHide = true
   ) => {
     setFeedback({ type, text });
+    clearFeedbackTimer();
 
     if (autoHide) {
-      window.clearTimeout((showFeedback as unknown as { timeout?: number }).timeout);
-      (showFeedback as unknown as { timeout?: number }).timeout = window.setTimeout(
-        () => setFeedback(null),
-        2500
-      );
+      feedbackTimeoutRef.current = window.setTimeout(() => {
+        setFeedback(null);
+        feedbackTimeoutRef.current = null;
+      }, 2500);
     }
   };
 
@@ -228,6 +246,13 @@ export function TripDetails() {
     if (!tripId) return;
     fetchTripDetails();
   }, [tripId]);
+
+  useEffect(() => {
+    return () => {
+      clearFeedbackTimer();
+      clearSavedNoteTimer();
+    };
+  }, []);
 
   const handleRemovePlace = async (tripPlaceId: string) => {
     setRemovingId(tripPlaceId);
@@ -379,8 +404,10 @@ export function TripDetails() {
     setSavedNoteId(tripPlaceId);
     showFeedback("success", "Note saved.");
 
-    setTimeout(() => {
+    clearSavedNoteTimer();
+    savedNoteTimeoutRef.current = window.setTimeout(() => {
       setSavedNoteId((current) => (current === tripPlaceId ? null : current));
+      savedNoteTimeoutRef.current = null;
     }, 1800);
   };
 
@@ -448,11 +475,17 @@ export function TripDetails() {
         className="rounded-2xl border border-border bg-card overflow-hidden"
       >
         <Link href={`/place/${place.id}`}>
-          <img
-            src={place.image_url}
-            alt={place.name}
-            className="w-full h-52 object-cover cursor-pointer"
-          />
+          {place.image_url ? (
+            <img
+              src={place.image_url}
+              alt={place.name}
+              className="w-full h-52 object-cover cursor-pointer"
+            />
+          ) : (
+            <div className="w-full h-52 bg-muted flex items-center justify-center cursor-pointer">
+              <ImageIcon className="w-10 h-10 text-muted-foreground" />
+            </div>
+          )}
         </Link>
 
         <div className="p-4">
@@ -481,9 +514,7 @@ export function TripDetails() {
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">
-              Notes
-            </label>
+            <label className="block text-sm font-medium mb-2">Notes</label>
             <textarea
               value={currentNote}
               onChange={(e) =>
@@ -615,9 +646,7 @@ export function TripDetails() {
           <p className="text-muted-foreground mb-6">
             This trip may have been deleted or is no longer available.
           </p>
-          <Button onClick={() => setLocation("/trips")}>
-            Back to trips
-          </Button>
+          <Button onClick={() => setLocation("/trips")}>Back to trips</Button>
         </div>
       </div>
     );
