@@ -53,23 +53,27 @@ export function Navbar() {
 
   const navLinks = [
     { name: t.nav.home, path: "/" },
-    { name: t.nav.cities, path: "/search?category=all" },
+    { name: t.nav.cities, path: "/cities" },
     { name: "Trips", path: "/trips" },
     { name: t.nav.favorites, path: "/favorites" },
     { name: t.nav.search, path: "/search" },
   ];
 
   const isLinkActive = (path: string) => {
-    if (path === "/trips") {
-      return location === "/trips" || location.startsWith("/trips/");
-    }
+  if (path === "/trips") {
+    return location === "/trips" || location.startsWith("/trips/");
+  }
 
-    if (path === "/profile") {
-      return location === "/profile";
-    }
+  if (path === "/cities") {
+    return location === "/cities" || location.startsWith("/city/");
+  }
 
-    return location === path;
-  };
+  if (path === "/profile") {
+    return location === "/profile";
+  }
+
+  return location === path;
+};
 
   const displayName = user?.user_metadata?.username || user?.email || "Account";
 

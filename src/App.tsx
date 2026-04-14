@@ -23,6 +23,7 @@ import { AdminEditCity } from "@/pages/AdminEditCity";
 import { Trips } from "@/pages/Trips";
 import { TripDetails } from "@/pages/TripDetails";
 import { Profile } from "@/pages/Profile";
+import { Cities } from "@/pages/Cities";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ function AppShell() {
           <Route path="/city/:slug" component={City} />
           <Route path="/place/:id" component={Place} />
           <Route path="/favorites" component={Favorites} />
+          <Route path="/cities" component={Cities} />
           <Route path="/search" component={Search} />
           <Route path="/login" component={Login} />
           <Route path="/signup" component={Signup} />

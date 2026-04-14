@@ -39,7 +39,7 @@ type DbPlace = {
   id: string;
   city_id: string;
   name: string;
-  category: "stay" | "activity" | "restaurant";
+  category: "stay" | "activity" | "restaurant" | string;
   description_en: string;
   description_fr: string;
   image_url: string;
@@ -75,14 +75,14 @@ export function Home() {
         console.error("Failed to fetch cities:", citiesRes.error);
         setCities([]);
       } else {
-        setCities((citiesRes.data as DbCity[]) || []);
+        setCities((citiesRes.data ?? []) as DbCity[]);
       }
 
       if (placesRes.error) {
         console.error("Failed to fetch places:", placesRes.error);
         setPlaces([]);
       } else {
-        setPlaces((placesRes.data as DbPlace[]) || []);
+        setPlaces((placesRes.data ?? []) as DbPlace[]);
       }
 
       setLoading(false);
@@ -112,7 +112,10 @@ export function Home() {
       id: place.id,
       cityId: place.city_id,
       name: place.name,
-      category: place.category,
+      category: String(place.category).trim().toLowerCase() as
+        | "stay"
+        | "activity"
+        | "restaurant",
       description: lang === "fr" ? place.description_fr : place.description_en,
       imageUrl: place.image_url,
       location: place.location ?? undefined,
@@ -242,7 +245,7 @@ export function Home() {
 
       {/* Cities */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="flex justify-between items-end mb-10">
+        <div className="flex justify-between items-end mb-10 gap-4">
           <div>
             <p className="text-primary text-xs font-semibold uppercase tracking-widest mb-2">
               {t.home.destinations.eyebrow}
@@ -251,6 +254,13 @@ export function Home() {
               {t.home.destinations.title}
             </h2>
           </div>
+
+          <Link
+            href="/cities"
+            className="hidden md:flex items-center gap-1.5 text-sm text-primary font-semibold hover:gap-2.5 transition-all"
+          >
+            View all <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
 
         {loading ? (
@@ -263,41 +273,52 @@ export function Home() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {cities.map((city, i) => (
-              <motion.div
-                key={city.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1, duration: 0.5 }}
-                className="group relative aspect-[3/4] rounded-2xl overflow-hidden cursor-pointer"
-                onClick={() => setLocation(`/city/${city.slug}`)}
-              >
-                <img
-                  src={city.image_url}
-                  alt={city.name}
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-colors duration-500" />
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {cities.slice(0, 3).map((city, i) => (
+                <motion.div
+                  key={city.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1, duration: 0.5 }}
+                  className="group relative aspect-[3/4] rounded-2xl overflow-hidden cursor-pointer"
+                  onClick={() => setLocation(`/city/${city.slug}`)}
+                >
+                  <img
+                    src={city.image_url}
+                    alt={city.name}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                  <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-colors duration-500" />
 
-                <div className="absolute bottom-0 left-0 right-0 p-6">
-                  <h3 className="text-2xl font-serif font-bold text-white mb-1">
-                    {city.name}
-                  </h3>
+                  <div className="absolute bottom-0 left-0 right-0 p-6">
+                    <h3 className="text-2xl font-serif font-bold text-white mb-1">
+                      {city.name}
+                    </h3>
 
-                  <p className="text-white/70 text-sm line-clamp-2 translate-y-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-400">
-                    {lang === "fr" ? city.tagline_fr : city.tagline_en}
-                  </p>
+                    <p className="text-white/70 text-sm line-clamp-2 translate-y-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-400">
+                      {lang === "fr" ? city.tagline_fr : city.tagline_en}
+                    </p>
 
-                  <div className="mt-3 flex items-center gap-1 text-primary text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-400 delay-75">
-                    {t.home.destinations.exploreCity} <ArrowRight className="w-4 h-4" />
+                    <div className="mt-3 flex items-center gap-1 text-primary text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-400 delay-75">
+                      {t.home.destinations.exploreCity} <ArrowRight className="w-4 h-4" />
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="mt-8 text-center md:hidden">
+              <Link
+                href="/cities"
+                className="inline-flex items-center gap-2 text-sm text-primary font-semibold border border-primary/40 px-6 py-3 rounded-full hover:bg-primary/5 transition-colors"
+              >
+                View all <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </>
         )}
       </section>
 
@@ -341,7 +362,7 @@ export function Home() {
                 </div>
               ))}
             </div>
-          ) : (
+          ) : featuredStays.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {featuredStays.map((stay, i) => (
                 <motion.div
@@ -354,6 +375,10 @@ export function Home() {
                   <PlaceCard place={stay} showSaveToTrip />
                 </motion.div>
               ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-border bg-card p-8 text-center">
+              <p className="text-muted-foreground">No stays available yet.</p>
             </div>
           )}
 
@@ -407,7 +432,7 @@ export function Home() {
               </div>
             ))}
           </div>
-        ) : (
+        ) : featuredActivities.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {featuredActivities.map((activity, i) => (
               <motion.div
@@ -420,6 +445,10 @@ export function Home() {
                 <PlaceCard place={activity} showSaveToTrip />
               </motion.div>
             ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-border bg-card p-8 text-center">
+            <p className="text-muted-foreground">No experiences available yet.</p>
           </div>
         )}
       </section>
@@ -464,7 +493,7 @@ export function Home() {
                 </div>
               ))}
             </div>
-          ) : (
+          ) : featuredRestaurants.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {featuredRestaurants.map((restaurant, i) => (
                 <motion.div
@@ -477,6 +506,10 @@ export function Home() {
                   <PlaceCard place={restaurant} showSaveToTrip />
                 </motion.div>
               ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-border bg-card p-8 text-center">
+              <p className="text-muted-foreground">No dining spots available yet.</p>
             </div>
           )}
 
