@@ -1,11 +1,18 @@
-import { useState, useEffect } from 'react';
-import { useLocation, Link } from 'wouter';
-import { motion } from 'framer-motion';
-import { Search as SearchIcon, MapPin, ArrowRight, Bed, Compass, Utensils } from 'lucide-react';
-import { PlaceCard } from '@/components/ui/PlaceCard';
-import { Input } from '@/components/ui/input';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { supabase } from '@/lib/supabase';
+import { useState, useEffect, useMemo } from "react";
+import { useLocation, Link } from "wouter";
+import { motion } from "framer-motion";
+import {
+  Search as SearchIcon,
+  MapPin,
+  ArrowRight,
+  Bed,
+  Compass,
+  Utensils,
+} from "lucide-react";
+import { PlaceCard } from "@/components/ui/PlaceCard";
+import { Input } from "@/components/ui/input";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { supabase } from "@/lib/supabase";
 
 type DbCity = {
   id: string;
@@ -32,7 +39,7 @@ type DbPlace = {
   id: string;
   city_id: string;
   name: string;
-  category: 'stay' | 'activity' | 'restaurant';
+  category: "stay" | "activity" | "restaurant";
   description_en: string;
   description_fr: string;
   image_url: string;
@@ -45,79 +52,103 @@ type DbPlace = {
 
 export function Home() {
   const [, setLocation] = useLocation();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState<'stay' | 'activity' | 'restaurant'>('stay');
+  const { t, lang } = useLanguage();
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState<
+    "stay" | "activity" | "restaurant"
+  >("stay");
   const [cities, setCities] = useState<DbCity[]>([]);
   const [places, setPlaces] = useState<DbPlace[]>([]);
-  const { t } = useLanguage();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase
-      .from('cities')
-      .select('*')
-      .order('id', { ascending: true })
-      .then(({ data, error }) => {
-        console.log('cities:', data);
-        console.log('cities error:', error);
+    const fetchHomeData = async () => {
+      setLoading(true);
 
-        if (error) {
-          console.error('Failed to fetch cities:', error);
-          return;
-        }
+      const [citiesRes, placesRes] = await Promise.all([
+        supabase.from("cities").select("*").order("name", { ascending: true }),
+        supabase.from("places").select("*").order("rating", { ascending: false }),
+      ]);
 
-        setCities((data as DbCity[]) || []);
-      });
-  }, []);
+      if (citiesRes.error) {
+        console.error("Failed to fetch cities:", citiesRes.error);
+        setCities([]);
+      } else {
+        setCities((citiesRes.data as DbCity[]) || []);
+      }
 
-  useEffect(() => {
-    supabase
-      .from('places')
-      .select('*')
-      .order('id', { ascending: true })
-      .then(({ data, error }) => {
-        console.log('places:', data);
-        console.log('places error:', error);
+      if (placesRes.error) {
+        console.error("Failed to fetch places:", placesRes.error);
+        setPlaces([]);
+      } else {
+        setPlaces((placesRes.data as DbPlace[]) || []);
+      }
 
-        if (error) {
-          console.error('Failed to fetch places:', error);
-          return;
-        }
+      setLoading(false);
+    };
 
-        setPlaces((data as DbPlace[]) || []);
-      });
+    fetchHomeData();
   }, []);
 
   const CATEGORIES = [
-    { label: t.hero.tabs.stays, value: 'stay' as const, icon: Bed },
-    { label: t.hero.tabs.experiences, value: 'activity' as const, icon: Compass },
-    { label: t.hero.tabs.dining, value: 'restaurant' as const, icon: Utensils },
+    { label: t.hero.tabs.stays, value: "stay" as const, icon: Bed },
+    { label: t.hero.tabs.experiences, value: "activity" as const, icon: Compass },
+    { label: t.hero.tabs.dining, value: "restaurant" as const, icon: Utensils },
   ];
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+
     const params = new URLSearchParams();
-    if (searchQuery.trim()) params.set('q', searchQuery.trim());
-    params.set('category', activeCategory);
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    params.set("category", activeCategory);
+
     setLocation(`/search?${params.toString()}`);
   };
 
-  const mappedPlaces = places.map((place) => ({
-    id: place.id,
-    cityId: place.city_id,
-    name: place.name,
-    category: place.category,
-    description: place.description_en,
-    imageUrl: place.image_url,
-    location: place.location ?? undefined,
-    rating: place.rating,
-    pricePerNight: place.price_per_night ?? undefined,
-    priceRange: place.price_range ?? undefined,
-    cuisine: place.cuisine ?? undefined,
-  }));
+  const mappedPlaces = useMemo(() => {
+    return places.map((place) => ({
+      id: place.id,
+      cityId: place.city_id,
+      name: place.name,
+      category: place.category,
+      description: lang === "fr" ? place.description_fr : place.description_en,
+      imageUrl: place.image_url,
+      location: place.location ?? undefined,
+      rating: place.rating,
+      pricePerNight: place.price_per_night ?? undefined,
+      priceRange: place.price_range ?? undefined,
+      cuisine: place.cuisine ?? undefined,
+    }));
+  }, [places, lang]);
 
-  const featuredStays = mappedPlaces.filter((p) => p.category === 'stay').slice(0, 3);
-  const featuredActivities = mappedPlaces.filter((p) => p.category === 'activity').slice(0, 3);
-  const featuredRestaurants = mappedPlaces.filter((p) => p.category === 'restaurant').slice(0, 3);
+  const featuredStays = useMemo(
+    () =>
+      mappedPlaces
+        .filter((p) => p.category === "stay")
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 3),
+    [mappedPlaces]
+  );
+
+  const featuredActivities = useMemo(
+    () =>
+      mappedPlaces
+        .filter((p) => p.category === "activity")
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 3),
+    [mappedPlaces]
+  );
+
+  const featuredRestaurants = useMemo(
+    () =>
+      mappedPlaces
+        .filter((p) => p.category === "restaurant")
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 3),
+    [mappedPlaces]
+  );
 
   return (
     <div className="w-full">
@@ -175,8 +206,8 @@ export function Home() {
                   onClick={() => setActiveCategory(value)}
                   className={`flex items-center gap-2 flex-1 justify-center py-2.5 text-sm font-semibold transition-all rounded-t-xl ${
                     activeCategory === value
-                      ? 'text-primary border-b-2 border-primary'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? "text-primary border-b-2 border-primary"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -196,6 +227,7 @@ export function Home() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
+
               <button
                 type="submit"
                 className="bg-primary text-primary-foreground px-6 h-11 rounded-xl font-semibold text-sm hover:bg-primary/90 active:scale-95 transition-all flex items-center gap-2 shrink-0"
@@ -221,36 +253,52 @@ export function Home() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {cities.map((city, i) => (
-            <motion.div
-              key={city.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1, duration: 0.5 }}
-              className="group relative aspect-[3/4] rounded-2xl overflow-hidden cursor-pointer"
-              onClick={() => setLocation(`/city/${city.slug}`)}
-            >
-              <img
-                src={city.image_url}
-                alt={city.name}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {[1, 2, 3].map((item) => (
+              <div
+                key={item}
+                className="aspect-[3/4] rounded-2xl bg-muted animate-pulse"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-              <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-colors duration-500" />
-              <div className="absolute bottom-0 left-0 right-0 p-6">
-                <h3 className="text-2xl font-serif font-bold text-white mb-1">{city.name}</h3>
-                <p className="text-white/70 text-sm line-clamp-2 translate-y-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-400">
-                  {city.tagline_en}
-                </p>
-                <div className="mt-3 flex items-center gap-1 text-primary text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-400 delay-75">
-                  {t.home.destinations.exploreCity} <ArrowRight className="w-4 h-4" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {cities.map((city, i) => (
+              <motion.div
+                key={city.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1, duration: 0.5 }}
+                className="group relative aspect-[3/4] rounded-2xl overflow-hidden cursor-pointer"
+                onClick={() => setLocation(`/city/${city.slug}`)}
+              >
+                <img
+                  src={city.image_url}
+                  alt={city.name}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-colors duration-500" />
+
+                <div className="absolute bottom-0 left-0 right-0 p-6">
+                  <h3 className="text-2xl font-serif font-bold text-white mb-1">
+                    {city.name}
+                  </h3>
+
+                  <p className="text-white/70 text-sm line-clamp-2 translate-y-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-400">
+                    {lang === "fr" ? city.tagline_fr : city.tagline_en}
+                  </p>
+
+                  <div className="mt-3 flex items-center gap-1 text-primary text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-400 delay-75">
+                    {t.home.destinations.exploreCity} <ArrowRight className="w-4 h-4" />
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Stays */}
@@ -264,8 +312,11 @@ export function Home() {
               <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
                 {t.home.stays.title}
               </h2>
-              <p className="text-muted-foreground mt-2 max-w-lg">{t.home.stays.subtitle}</p>
+              <p className="text-muted-foreground mt-2 max-w-lg">
+                {t.home.stays.subtitle}
+              </p>
             </div>
+
             <Link
               href="/search?category=stay"
               className="hidden md:flex items-center gap-1.5 text-sm text-primary font-semibold hover:gap-2.5 transition-all"
@@ -274,19 +325,37 @@ export function Home() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredStays.map((stay, i) => (
-              <motion.div
-                key={stay.id}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.08, duration: 0.5 }}
-              >
-                <PlaceCard place={stay} />
-              </motion.div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="rounded-2xl border border-border bg-card overflow-hidden animate-pulse"
+                >
+                  <div className="h-64 bg-muted" />
+                  <div className="p-4 space-y-3">
+                    <div className="h-6 w-2/3 bg-muted rounded" />
+                    <div className="h-4 w-1/2 bg-muted rounded" />
+                    <div className="h-4 w-full bg-muted rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featuredStays.map((stay, i) => (
+                <motion.div
+                  key={stay.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08, duration: 0.5 }}
+                >
+                  <PlaceCard place={stay} showSaveToTrip />
+                </motion.div>
+              ))}
+            </div>
+          )}
 
           <div className="mt-8 text-center md:hidden">
             <Link
@@ -309,8 +378,11 @@ export function Home() {
             <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
               {t.home.experiences.title}
             </h2>
-            <p className="text-muted-foreground mt-2 max-w-lg">{t.home.experiences.subtitle}</p>
+            <p className="text-muted-foreground mt-2 max-w-lg">
+              {t.home.experiences.subtitle}
+            </p>
           </div>
+
           <Link
             href="/search?category=activity"
             className="hidden md:flex items-center gap-1.5 text-sm text-primary font-semibold hover:gap-2.5 transition-all"
@@ -319,19 +391,37 @@ export function Home() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {featuredActivities.map((activity, i) => (
-            <motion.div
-              key={activity.id}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.08, duration: 0.5 }}
-            >
-              <PlaceCard place={activity} />
-            </motion.div>
-          ))}
-        </div>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((item) => (
+              <div
+                key={item}
+                className="rounded-2xl border border-border bg-card overflow-hidden animate-pulse"
+              >
+                <div className="h-64 bg-muted" />
+                <div className="p-4 space-y-3">
+                  <div className="h-6 w-2/3 bg-muted rounded" />
+                  <div className="h-4 w-1/2 bg-muted rounded" />
+                  <div className="h-4 w-full bg-muted rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {featuredActivities.map((activity, i) => (
+              <motion.div
+                key={activity.id}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.08, duration: 0.5 }}
+              >
+                <PlaceCard place={activity} showSaveToTrip />
+              </motion.div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Dining */}
@@ -345,8 +435,11 @@ export function Home() {
               <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
                 {t.home.dining.title}
               </h2>
-              <p className="text-muted-foreground mt-2 max-w-lg">{t.home.dining.subtitle}</p>
+              <p className="text-muted-foreground mt-2 max-w-lg">
+                {t.home.dining.subtitle}
+              </p>
             </div>
+
             <Link
               href="/search?category=restaurant"
               className="hidden md:flex items-center gap-1.5 text-sm text-primary font-semibold hover:gap-2.5 transition-all"
@@ -355,19 +448,37 @@ export function Home() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredRestaurants.map((restaurant, i) => (
-              <motion.div
-                key={restaurant.id}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.08, duration: 0.5 }}
-              >
-                <PlaceCard place={restaurant} />
-              </motion.div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="rounded-2xl border border-border bg-card overflow-hidden animate-pulse"
+                >
+                  <div className="h-64 bg-muted" />
+                  <div className="p-4 space-y-3">
+                    <div className="h-6 w-2/3 bg-muted rounded" />
+                    <div className="h-4 w-1/2 bg-muted rounded" />
+                    <div className="h-4 w-full bg-muted rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featuredRestaurants.map((restaurant, i) => (
+                <motion.div
+                  key={restaurant.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08, duration: 0.5 }}
+                >
+                  <PlaceCard place={restaurant} showSaveToTrip />
+                </motion.div>
+              ))}
+            </div>
+          )}
 
           <div className="mt-8 text-center md:hidden">
             <Link
