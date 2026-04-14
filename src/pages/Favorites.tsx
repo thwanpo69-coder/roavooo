@@ -1,18 +1,12 @@
 import { useEffect, useState } from "react";
 import { useFavorites } from "@/hooks/use-favorites";
 import { PlaceCard } from "@/components/ui/PlaceCard";
-import {
-  Heart,
-  FolderPlus,
-  CheckCircle2,
-  AlertCircle,
-  X,
-  Check,
-} from "lucide-react";
+import { Heart, FolderPlus } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabase";
+import { SaveToTripModal } from "@/components/trips/SaveToTripModal";
 
 type DbPlace = {
   id: string;
@@ -29,33 +23,13 @@ type DbPlace = {
   cuisine: string | null;
 };
 
-type Trip = {
-  id: string;
-  title: string;
-};
-
-type SaveStatus = {
-  type: "success" | "error" | "info";
-  message: string;
-} | null;
-
-type TripPlaceRow = {
-  trip_id: string;
-};
-
 export function Favorites() {
   const { favorites, user, loading: favoritesLoading } = useFavorites();
   const { t, lang } = useLanguage();
 
   const [places, setPlaces] = useState<DbPlace[]>([]);
   const [loadingPlaces, setLoadingPlaces] = useState(false);
-
-  const [userTrips, setUserTrips] = useState<Trip[]>([]);
   const [modalPlaceId, setModalPlaceId] = useState<string | null>(null);
-  const [savingToTrip, setSavingToTrip] = useState(false);
-  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>(null);
-  const [tripPlaceMap, setTripPlaceMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const loadPlaces = async () => {
@@ -96,127 +70,10 @@ export function Favorites() {
 
   const closeModal = () => {
     setModalPlaceId(null);
-    setSaveStatus(null);
-    setSelectedTripId(null);
-    setTripPlaceMap({});
-    setUserTrips([]);
-    setSavingToTrip(false);
   };
 
-  const openTripModal = async (placeId: string) => {
+  const openTripModal = (placeId: string) => {
     setModalPlaceId(placeId);
-    setSaveStatus(null);
-    setSelectedTripId(null);
-    setTripPlaceMap({});
-    setUserTrips([]);
-
-    if (!user) {
-      setSaveStatus({
-        type: "error",
-        message: "You must be logged in to save a place to a trip.",
-      });
-      return;
-    }
-
-    const [tripsRes, tripPlacesRes] = await Promise.all([
-      supabase
-        .from("trips")
-        .select("id, title")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false }),
-
-      supabase.from("trip_places").select("trip_id").eq("place_id", placeId),
-    ]);
-
-    if (tripsRes.error) {
-      console.error("Failed to fetch trips:", tripsRes.error);
-      setSaveStatus({
-        type: "error",
-        message: "Could not load your trips.",
-      });
-      return;
-    }
-
-    if (tripPlacesRes.error) {
-      console.error("Failed to fetch trip places:", tripPlacesRes.error);
-      setSaveStatus({
-        type: "error",
-        message: "Could not check existing saved trips.",
-      });
-      return;
-    }
-
-    const trips = (tripsRes.data as Trip[]) || [];
-    const tripPlaces = (tripPlacesRes.data as TripPlaceRow[]) || [];
-
-    const map: Record<string, boolean> = {};
-    tripPlaces.forEach((item) => {
-      map[item.trip_id] = true;
-    });
-
-    setTripPlaceMap(map);
-    setUserTrips(trips);
-
-    if (trips.length === 0) {
-      setSaveStatus({
-        type: "info",
-        message: "You do not have any trips yet. Create one first.",
-      });
-    }
-  };
-
-  const handleSaveToTrip = async (placeId: string, tripId: string) => {
-    if (tripPlaceMap[tripId]) return;
-
-    setSavingToTrip(true);
-    setSelectedTripId(tripId);
-    setSaveStatus(null);
-
-    const { error } = await supabase.from("trip_places").insert({
-      trip_id: tripId,
-      place_id: placeId,
-    });
-
-    if (error) {
-      console.error("Failed to save place to trip:", error);
-
-      const message = error.message.toLowerCase();
-
-      if (
-        message.includes("duplicate") ||
-        message.includes("unique") ||
-        message.includes("trip_places_trip_id_place_id_key")
-      ) {
-        setSaveStatus({
-          type: "error",
-          message: "This place is already in that trip.",
-        });
-      } else {
-        setSaveStatus({
-          type: "error",
-          message: "Could not save this place to the trip.",
-        });
-      }
-
-      setSavingToTrip(false);
-      return;
-    }
-
-    setTripPlaceMap((prev) => ({
-      ...prev,
-      [tripId]: true,
-    }));
-
-    setSaveStatus({
-      type: "success",
-      message: "Place added to trip successfully.",
-    });
-
-    setSavingToTrip(false);
-
-    setTimeout(() => {
-      closeModal();
-    }, 1200);
   };
 
   if (favoritesLoading) {
@@ -248,7 +105,9 @@ export function Favorites() {
           <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-6">
             <Heart className="w-10 h-10 text-muted-foreground/50" />
           </div>
-          <h2 className="text-2xl font-serif font-bold mb-3">Log in to save favorites</h2>
+          <h2 className="text-2xl font-serif font-bold mb-3">
+            Log in to save favorites
+          </h2>
           <p className="text-muted-foreground mb-8 max-w-md">
             Create an account or log in to save your favorite places and access them anytime.
           </p>
@@ -318,8 +177,12 @@ export function Favorites() {
           <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-6">
             <Heart className="w-10 h-10 text-muted-foreground/50" />
           </div>
-          <h2 className="text-2xl font-serif font-bold mb-3">{t.favorites.emptyTitle}</h2>
-          <p className="text-muted-foreground mb-8 max-w-md">{t.favorites.emptyMessage}</p>
+          <h2 className="text-2xl font-serif font-bold mb-3">
+            {t.favorites.emptyTitle}
+          </h2>
+          <p className="text-muted-foreground mb-8 max-w-md">
+            {t.favorites.emptyMessage}
+          </p>
           <Link href="/search">
             <Button size="lg" className="rounded-full px-8 text-lg font-semibold">
               {t.favorites.emptyCta}
@@ -347,121 +210,12 @@ export function Favorites() {
         </div>
       )}
 
-      {modalPlaceId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/50"
-            onClick={closeModal}
-          />
-
-          <div className="relative z-10 w-full max-w-md rounded-3xl border border-border bg-card shadow-2xl p-5 md:p-6">
-            <div className="flex items-start justify-between gap-4 mb-5">
-              <div>
-                <h3 className="text-xl font-semibold">Save to Trip</h3>
-                {activePlace && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {activePlace.name}
-                  </p>
-                )}
-              </div>
-
-              <button
-                onClick={closeModal}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                type="button"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {saveStatus && (
-              <div
-                className={`mb-4 rounded-xl border px-3 py-2 text-sm flex items-center gap-2 ${
-                  saveStatus.type === "success"
-                    ? "border-green-500/30 bg-green-500/10 text-green-400"
-                    : saveStatus.type === "error"
-                    ? "border-red-500/30 bg-red-500/10 text-red-400"
-                    : "border-border bg-muted text-muted-foreground"
-                }`}
-              >
-                {saveStatus.type === "success" ? (
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                ) : saveStatus.type === "error" ? (
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                ) : (
-                  <FolderPlus className="w-4 h-4 shrink-0" />
-                )}
-                <span>{saveStatus.message}</span>
-              </div>
-            )}
-
-            {userTrips.length === 0 ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  You do not have any trips yet. Create one first.
-                </p>
-                <Link
-                  href="/trips"
-                  className="inline-flex text-sm font-medium text-primary hover:opacity-80"
-                >
-                  Go to trips
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-                {userTrips.map((trip) => {
-                  const alreadyAdded = tripPlaceMap[trip.id];
-
-                  return (
-                    <button
-                      key={trip.id}
-                      onClick={() =>
-                        modalPlaceId &&
-                        !alreadyAdded &&
-                        handleSaveToTrip(modalPlaceId, trip.id)
-                      }
-                      disabled={savingToTrip || alreadyAdded}
-                      className={`w-full text-left px-4 py-3 rounded-xl border transition-colors disabled:opacity-60 ${
-                        alreadyAdded
-                          ? "border-border bg-muted text-muted-foreground cursor-not-allowed"
-                          : selectedTripId === trip.id
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:bg-muted"
-                      }`}
-                      type="button"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span>{trip.title}</span>
-
-                        {alreadyAdded ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
-                            <Check className="w-3.5 h-3.5" />
-                            Already added
-                          </span>
-                        ) : savingToTrip && selectedTripId === trip.id ? (
-                          <span className="text-xs text-muted-foreground">
-                            Saving...
-                          </span>
-                        ) : null}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {saveStatus?.type === "success" && (
-              <Link
-                href="/trips"
-                className="inline-flex mt-4 text-sm font-medium text-primary hover:opacity-80"
-              >
-                View my trips
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
+      <SaveToTripModal
+        placeId={modalPlaceId}
+        placeName={activePlace?.name}
+        isOpen={!!modalPlaceId}
+        onClose={closeModal}
+      />
     </div>
   );
 }
