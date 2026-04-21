@@ -13,8 +13,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Info,
-  FolderOpen,
-  Image as ImageIcon,
+  Bed,
+  Compass,
+  Utensils,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ type City = {
 type PlaceInfo = {
   id: string;
   name: string;
-  image_url: string | null;
+  image_url: string;
   rating: number;
   location: string | null;
   category: "stay" | "activity" | "restaurant";
@@ -73,6 +74,7 @@ export function TripDetails() {
   const [places, setPlaces] = useState<TripPlaceRow[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [deletingTrip, setDeletingTrip] = useState(false);
 
@@ -92,7 +94,6 @@ export function TripDetails() {
   const [savedNoteId, setSavedNoteId] = useState<string | null>(null);
 
   const [feedback, setFeedback] = useState<FeedbackMessage>(null);
-
   const feedbackTimeoutRef = useRef<number | null>(null);
   const savedNoteTimeoutRef = useRef<number | null>(null);
 
@@ -132,9 +133,9 @@ export function TripDetails() {
     autoHide = true
   ) => {
     setFeedback({ type, text });
-    clearFeedbackTimer();
 
     if (autoHide) {
+      clearFeedbackTimer();
       feedbackTimeoutRef.current = window.setTimeout(() => {
         setFeedback(null);
         feedbackTimeoutRef.current = null;
@@ -188,10 +189,7 @@ export function TripDetails() {
         `
         )
         .eq("trip_id", tripId),
-      supabase
-        .from("cities")
-        .select("id, slug, name")
-        .order("name", { ascending: true }),
+      supabase.from("cities").select("id, slug, name").order("name", { ascending: true }),
     ]);
 
     if (tripRes.error) {
@@ -236,23 +234,20 @@ export function TripDetails() {
       console.error("Failed to fetch cities:", citiesRes.error);
       setCities([]);
     } else {
-      setCities((citiesRes.data as City[]) || []);
+      setCities((citiesRes.data ?? []) as City[]);
     }
 
     setLoading(false);
   };
 
   useEffect(() => {
-    if (!tripId) return;
     fetchTripDetails();
-  }, [tripId]);
 
-  useEffect(() => {
     return () => {
       clearFeedbackTimer();
       clearSavedNoteTimer();
     };
-  }, []);
+  }, [tripId]);
 
   const handleRemovePlace = async (tripPlaceId: string) => {
     setRemovingId(tripPlaceId);
@@ -385,9 +380,7 @@ export function TripDetails() {
     }
 
     setPlaces((prev) =>
-      prev.map((item) =>
-        item.id === tripPlaceId ? { ...item, note } : item
-      )
+      prev.map((item) => (item.id === tripPlaceId ? { ...item, note } : item))
     );
 
     setNoteValues((prev) => ({
@@ -429,9 +422,7 @@ export function TripDetails() {
     }
 
     setPlaces((prev) =>
-      prev.map((item) =>
-        item.id === tripPlaceId ? { ...item, note: "" } : item
-      )
+      prev.map((item) => (item.id === tripPlaceId ? { ...item, note: "" } : item))
     );
 
     setNoteValues((prev) => ({
@@ -447,6 +438,15 @@ export function TripDetails() {
     setSavingNoteId(null);
     showFeedback("success", "Note deleted.");
   };
+
+  const city = trip?.city_id ? cityMap[trip.city_id] : null;
+
+  const tripDateLabel =
+    trip?.start_date || trip?.end_date
+      ? `${formatDate(trip?.start_date ?? null) || "No start date"} → ${
+          formatDate(trip?.end_date ?? null) || "No end date"
+        }`
+      : null;
 
   const renderPlaceCard = (item: TripPlaceRow) => {
     const place = item.place;
@@ -475,17 +475,11 @@ export function TripDetails() {
         className="rounded-2xl border border-border bg-card overflow-hidden"
       >
         <Link href={`/place/${place.id}`}>
-          {place.image_url ? (
-            <img
-              src={place.image_url}
-              alt={place.name}
-              className="w-full h-52 object-cover cursor-pointer"
-            />
-          ) : (
-            <div className="w-full h-52 bg-muted flex items-center justify-center cursor-pointer">
-              <ImageIcon className="w-10 h-10 text-muted-foreground" />
-            </div>
-          )}
+          <img
+            src={place.image_url}
+            alt={place.name}
+            className="w-full h-52 object-cover cursor-pointer"
+          />
         </Link>
 
         <div className="p-4">
@@ -579,9 +573,7 @@ export function TripDetails() {
               className="w-full mt-2"
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              {removingId === item.id
-                ? "Removing..."
-                : "Remove place from trip"}
+              {removingId === item.id ? "Removing..." : "Remove place from trip"}
             </Button>
           )}
         </div>
@@ -589,13 +581,21 @@ export function TripDetails() {
     );
   };
 
-  const renderPlaceSection = (title: string, items: TripPlaceRow[]) => {
+  const renderPlaceSection = (
+    title: string,
+    items: TripPlaceRow[],
+    icon: React.ReactNode
+  ) => {
     if (items.length === 0) return null;
 
     return (
       <section className="mb-10">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-semibold">{title}</h2>
+          <div className="flex items-center gap-2">
+            {icon}
+            <h2 className="text-xl font-semibold">{title}</h2>
+          </div>
+
           <span className="text-sm text-muted-foreground">
             {items.length} {items.length === 1 ? "place" : "places"}
           </span>
@@ -652,14 +652,6 @@ export function TripDetails() {
     );
   }
 
-  const city = trip.city_id ? cityMap[trip.city_id] : null;
-  const tripDateLabel =
-    trip.start_date || trip.end_date
-      ? `${formatDate(trip.start_date) || "No start date"} → ${
-          formatDate(trip.end_date) || "No end date"
-        }`
-      : null;
-
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
@@ -715,30 +707,30 @@ export function TripDetails() {
                 )}
 
                 <div className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground">
-                  <FolderOpen className="w-4 h-4 text-primary" />
+                  <StickyNote className="w-4 h-4 text-primary" />
                   <span>
                     {places.length} saved {places.length === 1 ? "place" : "places"}
                   </span>
                 </div>
 
                 <div className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground">
-                  <StickyNote className="w-4 h-4 text-primary" />
-                  <span>{notesCount} {notesCount === 1 ? "note" : "notes"}</span>
+                  <CheckCircle2 className="w-4 h-4 text-primary" />
+                  <span>
+                    {notesCount} {notesCount === 1 ? "note" : "notes"}
+                  </span>
                 </div>
               </div>
 
               {trip.notes ? (
-                <p className="text-muted-foreground leading-relaxed">
-                  {trip.notes}
-                </p>
+                <p className="text-muted-foreground leading-relaxed">{trip.notes}</p>
               ) : (
-                <p className="text-sm italic text-muted-foreground/70">
+                <p className="text-muted-foreground/70 italic">
                   No trip notes yet.
                 </p>
               )}
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex gap-3">
               <Button variant="outline" onClick={() => setEditing(true)}>
                 <Pencil className="w-4 h-4 mr-2" />
                 Edit trip
@@ -828,16 +820,10 @@ export function TripDetails() {
       </div>
 
       {places.length === 0 ? (
-        <div className="rounded-2xl border border-border p-8 bg-card">
-          <div className="flex items-center gap-2 mb-3">
-            <StickyNote className="w-5 h-5 text-primary" />
-            <h2 className="text-xl font-semibold">Saved places</h2>
-          </div>
-
+        <div className="rounded-xl border border-border p-6 bg-card">
           <p className="text-muted-foreground">
             No places added to this trip yet.
           </p>
-
           <Link
             href="/search"
             className="inline-flex mt-4 text-sm font-medium text-primary hover:opacity-80"
@@ -847,14 +833,23 @@ export function TripDetails() {
         </div>
       ) : (
         <>
-          <div className="flex items-center gap-2 mb-6">
-            <StickyNote className="w-5 h-5 text-primary" />
-            <h2 className="text-2xl font-semibold">Saved places</h2>
-          </div>
+          {renderPlaceSection(
+            "Stays",
+            groupedPlaces.stay,
+            <Bed className="w-5 h-5 text-primary" />
+          )}
 
-          {renderPlaceSection("Stays", groupedPlaces.stay)}
-          {renderPlaceSection("Activities", groupedPlaces.activity)}
-          {renderPlaceSection("Restaurants", groupedPlaces.restaurant)}
+          {renderPlaceSection(
+            "Activities",
+            groupedPlaces.activity,
+            <Compass className="w-5 h-5 text-primary" />
+          )}
+
+          {renderPlaceSection(
+            "Restaurants",
+            groupedPlaces.restaurant,
+            <Utensils className="w-5 h-5 text-primary" />
+          )}
         </>
       )}
     </div>
