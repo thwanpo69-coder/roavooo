@@ -10,22 +10,16 @@ import {
   Pencil,
   Save,
   X,
-  CheckCircle2,
-  AlertCircle,
   Camera,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 type ProfileStats = {
   tripsCount: number;
   favoritesCount: number;
 };
-
-type FeedbackMessage = {
-  type: "success" | "error";
-  text: string;
-} | null;
 
 type ProfileRow = {
   id: string;
@@ -36,6 +30,8 @@ type ProfileRow = {
 };
 
 export function Profile() {
+  const { toast } = useToast();
+
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
@@ -48,17 +44,6 @@ export function Profile() {
   const [username, setUsername] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [feedback, setFeedback] = useState<FeedbackMessage>(null);
-
-  const showFeedback = (type: "success" | "error", text: string) => {
-    setFeedback({ type, text });
-
-    window.clearTimeout((showFeedback as unknown as { timeout?: number }).timeout);
-    (showFeedback as unknown as { timeout?: number }).timeout = window.setTimeout(
-      () => setFeedback(null),
-      2500
-    );
-  };
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -125,14 +110,17 @@ export function Profile() {
     const cleanUsername = username.trim();
 
     if (!cleanUsername) {
-      showFeedback("error", "Username cannot be empty.");
+      toast({
+        variant: "destructive",
+        title: "Username required",
+        description: "Username cannot be empty.",
+      });
       return;
     }
 
     if (!user) return;
 
     setSaving(true);
-    setFeedback(null);
 
     const { data, error } = await supabase.auth.updateUser({
       data: {
@@ -142,7 +130,11 @@ export function Profile() {
 
     if (error) {
       console.error("Failed to update username in auth:", error);
-      showFeedback("error", error.message || "Could not update username.");
+      toast({
+        variant: "destructive",
+        title: "Could not update username",
+        description: error.message || "Please try again.",
+      });
       setSaving(false);
       return;
     }
@@ -162,10 +154,12 @@ export function Profile() {
       setUsername(updatedUser?.user_metadata?.username || cleanUsername);
       setEditing(false);
       setSaving(false);
-      showFeedback(
-        "error",
-        "Username changed in account, but not in profile table."
-      );
+
+      toast({
+        variant: "destructive",
+        title: "Partial update",
+        description: "Username changed in account, but not in profile table.",
+      });
       return;
     }
 
@@ -174,13 +168,16 @@ export function Profile() {
     setUsername(updatedUser?.user_metadata?.username || cleanUsername);
     setEditing(false);
     setSaving(false);
-    showFeedback("success", "Username updated successfully.");
+
+    toast({
+      title: "Username updated",
+      description: "Your username was updated successfully.",
+    });
   };
 
   const handleCancelEdit = () => {
     setUsername(profile?.username || user?.user_metadata?.username || "");
     setEditing(false);
-    setFeedback(null);
   };
 
   const handleAvatarUpload = async (
@@ -192,19 +189,25 @@ export function Profile() {
 
     const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
-      showFeedback("error", "Please upload a PNG, JPG, or WEBP image.");
+      toast({
+        variant: "destructive",
+        title: "Invalid image type",
+        description: "Please upload a PNG, JPG, or WEBP image.",
+      });
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      showFeedback("error", "Image must be smaller than 2MB.");
+      toast({
+        variant: "destructive",
+        title: "Image too large",
+        description: "Image must be smaller than 2MB.",
+      });
       return;
     }
 
     setUploadingAvatar(true);
-    setFeedback(null);
 
-    // One constant file path per user so old avatar gets overwritten
     const filePath = `${user.id}/avatar`;
 
     const { error: uploadError } = await supabase.storage
@@ -215,7 +218,11 @@ export function Profile() {
 
     if (uploadError) {
       console.error("Failed to upload avatar:", uploadError);
-      showFeedback("error", "Could not upload avatar.");
+      toast({
+        variant: "destructive",
+        title: "Could not upload avatar",
+        description: "Please try again.",
+      });
       setUploadingAvatar(false);
       return;
     }
@@ -235,14 +242,22 @@ export function Profile() {
 
     if (profileError) {
       console.error("Failed to save avatar URL:", profileError);
-      showFeedback("error", "Avatar uploaded, but profile was not updated.");
+      toast({
+        variant: "destructive",
+        title: "Profile not updated",
+        description: "Avatar uploaded, but profile was not updated.",
+      });
       setUploadingAvatar(false);
       return;
     }
 
     setProfile(updatedProfile as ProfileRow);
     setUploadingAvatar(false);
-    showFeedback("success", "Avatar updated successfully.");
+
+    toast({
+      title: "Avatar updated",
+      description: "Your avatar was updated successfully.",
+    });
 
     e.target.value = "";
   };
@@ -289,23 +304,6 @@ export function Profile() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
-      {feedback && (
-        <div
-          className={`mb-6 rounded-2xl border px-4 py-3 flex items-center gap-3 ${
-            feedback.type === "success"
-              ? "border-green-500/30 bg-green-500/10 text-green-400"
-              : "border-red-500/30 bg-red-500/10 text-red-400"
-          }`}
-        >
-          {feedback.type === "success" ? (
-            <CheckCircle2 className="w-5 h-5 shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 shrink-0" />
-          )}
-          <span>{feedback.text}</span>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <div className="rounded-3xl border border-border bg-card p-6">

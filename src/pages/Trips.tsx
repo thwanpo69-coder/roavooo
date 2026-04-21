@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import {
   MapPin,
@@ -6,10 +6,9 @@ import {
   Plus,
   FolderOpen,
   Image as ImageIcon,
-  CheckCircle2,
-  AlertCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 type Trip = {
   id: string;
@@ -41,13 +40,9 @@ type TripPlaceRow = {
     | null;
 };
 
-type FeedbackMessage = {
-  type: "success" | "error";
-  text: string;
-} | null;
-
 export function Trips() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   const [trips, setTrips] = useState<Trip[]>([]);
   const [cities, setCities] = useState<City[]>([]);
@@ -59,7 +54,6 @@ export function Trips() {
   const [tripCoverImages, setTripCoverImages] = useState<Record<string, string>>(
     {}
   );
-  const [feedback, setFeedback] = useState<FeedbackMessage>(null);
 
   const [title, setTitle] = useState("");
   const [cityId, setCityId] = useState("");
@@ -67,28 +61,9 @@ export function Trips() {
   const [endDate, setEndDate] = useState("");
   const [notes, setNotes] = useState("");
 
-  const feedbackTimeoutRef = useRef<number | null>(null);
-
   const cityMap = useMemo(() => {
     return Object.fromEntries(cities.map((city) => [city.id, city]));
   }, [cities]);
-
-  const clearFeedbackTimer = () => {
-    if (feedbackTimeoutRef.current) {
-      window.clearTimeout(feedbackTimeoutRef.current);
-      feedbackTimeoutRef.current = null;
-    }
-  };
-
-  const showFeedback = (type: "success" | "error", text: string) => {
-    setFeedback({ type, text });
-    clearFeedbackTimer();
-
-    feedbackTimeoutRef.current = window.setTimeout(() => {
-      setFeedback(null);
-      feedbackTimeoutRef.current = null;
-    }, 2500);
-  };
 
   const formatDate = (value: string | null) => {
     if (!value) return null;
@@ -139,13 +114,13 @@ export function Trips() {
     if (tripsRes.error) {
       console.error("Error fetching trips:", tripsRes.error);
     } else {
-      setTrips((tripsRes.data as Trip[]) || []);
+      setTrips((tripsRes.data ?? []) as Trip[]);
     }
 
     if (citiesRes.error) {
       console.error("Error fetching cities:", citiesRes.error);
     } else {
-      setCities((citiesRes.data as City[]) || []);
+      setCities((citiesRes.data ?? []) as City[]);
     }
 
     if (tripPlacesRes.error) {
@@ -154,7 +129,7 @@ export function Trips() {
       const counts: Record<string, number> = {};
       const covers: Record<string, string> = {};
 
-      ((tripPlacesRes.data as TripPlaceRow[]) || []).forEach((item) => {
+      ((tripPlacesRes.data ?? []) as TripPlaceRow[]).forEach((item) => {
         counts[item.trip_id] = (counts[item.trip_id] || 0) + 1;
 
         if (!covers[item.trip_id]) {
@@ -177,10 +152,6 @@ export function Trips() {
 
   useEffect(() => {
     fetchTrips();
-
-    return () => {
-      clearFeedbackTimer();
-    };
   }, []);
 
   const resetForm = () => {
@@ -196,23 +167,34 @@ export function Trips() {
     const cleanNotes = notes.trim();
 
     if (!cleanTitle) {
-      showFeedback("error", "Please enter a trip title.");
+      toast({
+        variant: "destructive",
+        title: "Trip title required",
+        description: "Please enter a trip title.",
+      });
       return;
     }
 
     if (startDate && endDate && startDate > endDate) {
-      showFeedback("error", "End date must be after start date.");
+      toast({
+        variant: "destructive",
+        title: "Invalid dates",
+        description: "End date must be after start date.",
+      });
       return;
     }
 
     setCreating(true);
-    setFeedback(null);
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
 
     if (userError) {
       console.error("Error fetching user:", userError);
-      showFeedback("error", "Could not get user.");
+      toast({
+        variant: "destructive",
+        title: "Could not get user",
+        description: "Please try again.",
+      });
       setCreating(false);
       return;
     }
@@ -220,7 +202,11 @@ export function Trips() {
     const user = userData.user;
 
     if (!user) {
-      showFeedback("error", "You must be logged in to create a trip.");
+      toast({
+        variant: "destructive",
+        title: "Login required",
+        description: "You must be logged in to create a trip.",
+      });
       setCreating(false);
       return;
     }
@@ -236,7 +222,11 @@ export function Trips() {
 
     if (error) {
       console.error("Error creating trip:", error);
-      showFeedback("error", "Could not create trip.");
+      toast({
+        variant: "destructive",
+        title: "Could not create trip",
+        description: "Please try again.",
+      });
       setCreating(false);
       return;
     }
@@ -244,7 +234,11 @@ export function Trips() {
     resetForm();
     await fetchTrips();
     setCreating(false);
-    showFeedback("success", "Trip created successfully.");
+
+    toast({
+      title: "Trip created",
+      description: "Your trip was created successfully.",
+    });
   };
 
   if (loading) {
@@ -259,23 +253,6 @@ export function Trips() {
           Create and organize your trips in one place.
         </p>
       </div>
-
-      {feedback && (
-        <div
-          className={`mb-6 rounded-2xl border px-4 py-3 flex items-center gap-3 ${
-            feedback.type === "success"
-              ? "border-green-500/30 bg-green-500/10 text-green-400"
-              : "border-red-500/30 bg-red-500/10 text-red-400"
-          }`}
-        >
-          {feedback.type === "success" ? (
-            <CheckCircle2 className="w-5 h-5 shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 shrink-0" />
-          )}
-          <span>{feedback.text}</span>
-        </div>
-      )}
 
       {trips.length === 0 ? (
         <div className="rounded-2xl border border-border bg-card p-8 mb-8">

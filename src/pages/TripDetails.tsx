@@ -11,14 +11,13 @@ import {
   X,
   StickyNote,
   CheckCircle2,
-  AlertCircle,
-  Info,
   Bed,
   Compass,
   Utensils,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 type Trip = {
   id: string;
@@ -60,15 +59,11 @@ type TripPlaceRow = {
   place: PlaceInfo | null;
 };
 
-type FeedbackMessage = {
-  type: "success" | "error" | "info";
-  text: string;
-} | null;
-
 export function TripDetails() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/trips/:id");
   const tripId = params?.id;
+  const { toast } = useToast();
 
   const [trip, setTrip] = useState<Trip | null>(null);
   const [places, setPlaces] = useState<TripPlaceRow[]>([]);
@@ -93,8 +88,6 @@ export function TripDetails() {
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null);
   const [savedNoteId, setSavedNoteId] = useState<string | null>(null);
 
-  const [feedback, setFeedback] = useState<FeedbackMessage>(null);
-  const feedbackTimeoutRef = useRef<number | null>(null);
   const savedNoteTimeoutRef = useRef<number | null>(null);
 
   const cityMap = useMemo(() => {
@@ -113,33 +106,10 @@ export function TripDetails() {
     return places.filter((item) => (item.note || "").trim().length > 0).length;
   }, [places]);
 
-  const clearFeedbackTimer = () => {
-    if (feedbackTimeoutRef.current) {
-      window.clearTimeout(feedbackTimeoutRef.current);
-      feedbackTimeoutRef.current = null;
-    }
-  };
-
   const clearSavedNoteTimer = () => {
     if (savedNoteTimeoutRef.current) {
       window.clearTimeout(savedNoteTimeoutRef.current);
       savedNoteTimeoutRef.current = null;
-    }
-  };
-
-  const showFeedback = (
-    type: "success" | "error" | "info",
-    text: string,
-    autoHide = true
-  ) => {
-    setFeedback({ type, text });
-
-    if (autoHide) {
-      clearFeedbackTimer();
-      feedbackTimeoutRef.current = window.setTimeout(() => {
-        setFeedback(null);
-        feedbackTimeoutRef.current = null;
-      }, 2500);
     }
   };
 
@@ -211,7 +181,7 @@ export function TripDetails() {
       setSavedNoteValues({});
     } else {
       const normalized: TripPlaceRow[] = (
-        (placesRes.data as RawTripPlaceRow[]) || []
+        (placesRes.data ?? []) as RawTripPlaceRow[]
       ).map((item) => ({
         id: item.id,
         place_id: item.place_id,
@@ -244,14 +214,12 @@ export function TripDetails() {
     fetchTripDetails();
 
     return () => {
-      clearFeedbackTimer();
       clearSavedNoteTimer();
     };
   }, [tripId]);
 
   const handleRemovePlace = async (tripPlaceId: string) => {
     setRemovingId(tripPlaceId);
-    setFeedback(null);
 
     const { error } = await supabase
       .from("trip_places")
@@ -260,7 +228,11 @@ export function TripDetails() {
 
     if (error) {
       console.error("Failed to remove place from trip:", error);
-      showFeedback("error", "Could not remove this place from the trip.");
+      toast({
+        variant: "destructive",
+        title: "Could not remove place",
+        description: "Please try again.",
+      });
       setRemovingId(null);
       return;
     }
@@ -278,7 +250,11 @@ export function TripDetails() {
     });
 
     setRemovingId(null);
-    showFeedback("success", "Place removed from trip.");
+
+    toast({
+      title: "Place removed",
+      description: "The place was removed from your trip.",
+    });
   };
 
   const handleSaveTrip = async () => {
@@ -288,17 +264,24 @@ export function TripDetails() {
     const cleanNotes = notes.trim();
 
     if (!cleanTitle) {
-      showFeedback("error", "Please enter a trip title.");
+      toast({
+        variant: "destructive",
+        title: "Trip title required",
+        description: "Please enter a trip title.",
+      });
       return;
     }
 
     if (startDate && endDate && startDate > endDate) {
-      showFeedback("error", "End date must be after start date.");
+      toast({
+        variant: "destructive",
+        title: "Invalid dates",
+        description: "End date must be after start date.",
+      });
       return;
     }
 
     setSavingTrip(true);
-    setFeedback(null);
 
     const { data, error } = await supabase
       .from("trips")
@@ -315,7 +298,11 @@ export function TripDetails() {
 
     if (error) {
       console.error("Failed to update trip:", error);
-      showFeedback("error", "Could not update trip.");
+      toast({
+        variant: "destructive",
+        title: "Could not update trip",
+        description: "Please try again.",
+      });
       setSavingTrip(false);
       return;
     }
@@ -325,14 +312,17 @@ export function TripDetails() {
     fillFormFromTrip(updatedTrip);
     setEditing(false);
     setSavingTrip(false);
-    showFeedback("success", "Trip updated successfully.");
+
+    toast({
+      title: "Trip updated",
+      description: "Your trip was updated successfully.",
+    });
   };
 
   const handleCancelEdit = () => {
     if (!trip) return;
     fillFormFromTrip(trip);
     setEditing(false);
-    setFeedback(null);
   };
 
   const handleDeleteTrip = async () => {
@@ -345,18 +335,27 @@ export function TripDetails() {
     if (!confirmed) return;
 
     setDeletingTrip(true);
-    setFeedback(null);
 
     const { error } = await supabase.from("trips").delete().eq("id", trip.id);
 
     if (error) {
       console.error("Failed to delete trip:", error);
-      showFeedback("error", "Could not delete trip.");
+      toast({
+        variant: "destructive",
+        title: "Could not delete trip",
+        description: "Please try again.",
+      });
       setDeletingTrip(false);
       return;
     }
 
     setDeletingTrip(false);
+
+    toast({
+      title: "Trip deleted",
+      description: "The trip was deleted successfully.",
+    });
+
     setLocation("/trips");
   };
 
@@ -365,7 +364,6 @@ export function TripDetails() {
 
     setSavingNoteId(tripPlaceId);
     setSavedNoteId(null);
-    setFeedback(null);
 
     const { error } = await supabase
       .from("trip_places")
@@ -374,7 +372,11 @@ export function TripDetails() {
 
     if (error) {
       console.error("Failed to save note:", error);
-      showFeedback("error", "Could not save note.");
+      toast({
+        variant: "destructive",
+        title: "Could not save note",
+        description: "Please try again.",
+      });
       setSavingNoteId(null);
       return;
     }
@@ -395,7 +397,11 @@ export function TripDetails() {
 
     setSavingNoteId(null);
     setSavedNoteId(tripPlaceId);
-    showFeedback("success", "Note saved.");
+
+    toast({
+      title: "Note saved",
+      description: "Your place note was saved successfully.",
+    });
 
     clearSavedNoteTimer();
     savedNoteTimeoutRef.current = window.setTimeout(() => {
@@ -407,7 +413,6 @@ export function TripDetails() {
   const handleDeleteNote = async (tripPlaceId: string) => {
     setSavingNoteId(tripPlaceId);
     setSavedNoteId(null);
-    setFeedback(null);
 
     const { error } = await supabase
       .from("trip_places")
@@ -416,7 +421,11 @@ export function TripDetails() {
 
     if (error) {
       console.error("Failed to delete note:", error);
-      showFeedback("error", "Could not delete note.");
+      toast({
+        variant: "destructive",
+        title: "Could not delete note",
+        description: "Please try again.",
+      });
       setSavingNoteId(null);
       return;
     }
@@ -436,7 +445,11 @@ export function TripDetails() {
     }));
 
     setSavingNoteId(null);
-    showFeedback("success", "Note deleted.");
+
+    toast({
+      title: "Note deleted",
+      description: "The note was removed successfully.",
+    });
   };
 
   const city = trip?.city_id ? cityMap[trip.city_id] : null;
@@ -663,27 +676,6 @@ export function TripDetails() {
           Back to trips
         </button>
       </div>
-
-      {feedback && (
-        <div
-          className={`mb-6 rounded-2xl border px-4 py-3 flex items-center gap-3 ${
-            feedback.type === "success"
-              ? "border-green-500/30 bg-green-500/10 text-green-400"
-              : feedback.type === "error"
-              ? "border-red-500/30 bg-red-500/10 text-red-400"
-              : "border-border bg-card text-muted-foreground"
-          }`}
-        >
-          {feedback.type === "success" ? (
-            <CheckCircle2 className="w-5 h-5 shrink-0" />
-          ) : feedback.type === "error" ? (
-            <AlertCircle className="w-5 h-5 shrink-0" />
-          ) : (
-            <Info className="w-5 h-5 shrink-0" />
-          )}
-          <span>{feedback.text}</span>
-        </div>
-      )}
 
       <div className="rounded-2xl border border-border bg-card p-5 md:p-6 mb-8">
         {!editing ? (
