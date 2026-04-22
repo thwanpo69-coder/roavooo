@@ -24,6 +24,7 @@ import { Trips } from "@/pages/Trips";
 import { TripDetails } from "@/pages/TripDetails";
 import { Profile } from "@/pages/Profile";
 import { Cities } from "@/pages/Cities";
+import { Recent } from "@/pages/Recent";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -56,6 +57,8 @@ function AppShell() {
           <Route path="/admin/cities/:id/edit" component={AdminEditCity} />
           <Route path="/trips" component={Trips} />
           <Route path="/trips/:id" component={TripDetails} />
+          <Route path="/recent" component={Recent} />
+
 
           <Route component={NotFound} />
         </Switch>

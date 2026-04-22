@@ -313,20 +313,27 @@ export function Home() {
 
       {userId && mappedRecentPlaces.length > 0 && (
         <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-          <div className="flex justify-between items-end mb-10">
-            <div>
-              <p className="text-primary text-xs font-semibold uppercase tracking-widest mb-2">
-                Personal
-              </p>
-              <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground flex items-center gap-3">
-                <History className="w-8 h-8 text-primary" />
-                Continue exploring
-              </h2>
-              <p className="text-muted-foreground mt-2 max-w-lg">
-                Jump back into places you recently viewed.
-              </p>
-            </div>
+          <div className="flex justify-between items-end mb-10 gap-4">
+          <div>
+            <p className="text-primary text-xs font-semibold uppercase tracking-widest mb-2">
+              Personal
+            </p>
+            <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground flex items-center gap-3">
+              <History className="w-8 h-8 text-primary" />
+              Continue exploring
+            </h2>
+            <p className="text-muted-foreground mt-2 max-w-lg">
+              Jump back into places you recently viewed.
+            </p>
           </div>
+
+          <Link
+            href="/recent"
+            className="hidden md:flex items-center gap-1.5 text-sm text-primary font-semibold hover:gap-2.5 transition-all"
+          >
+            View all <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {mappedRecentPlaces.map((place, i) => (
@@ -340,6 +347,15 @@ export function Home() {
                 <PlaceCard place={place} showSaveToTrip />
               </motion.div>
             ))}
+          </div>
+
+          <div className="mt-8 text-center md:hidden">
+            <Link
+              href="/recent"
+              className="inline-flex items-center gap-2 text-sm text-primary font-semibold border border-primary/40 px-6 py-3 rounded-full hover:bg-primary/5 transition-colors"
+            >
+              View all <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         </section>
       )}
