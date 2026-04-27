@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Link, useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 export function Login() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -26,13 +28,21 @@ export function Login() {
 
       if (usernameError) {
         console.error(usernameError);
-        alert("Could not check username. Please try again.");
+        toast({
+          variant: "destructive",
+          title: "Login failed",
+          description: "Could not check username. Please try again.",
+        });
         setLoading(false);
         return;
       }
 
       if (!emailFromUsername) {
-        alert("Username not found.");
+        toast({
+          variant: "destructive",
+          title: "Username not found",
+          description: "Check your username or log in with your email.",
+        });
         setLoading(false);
         return;
       }
@@ -48,11 +58,28 @@ export function Login() {
     setLoading(false);
 
     if (error) {
-      alert(error.message);
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: "Invalid username/email or password.",
+      });
       return;
     }
 
-    setLocation("/favorites");
+    toast({
+      title: "Welcome back",
+      description: "You are logged in successfully.",
+    });
+
+    const redirectAfterLogin = localStorage.getItem("redirectAfterLogin");
+
+    if (redirectAfterLogin) {
+      localStorage.removeItem("redirectAfterLogin");
+      setLocation(redirectAfterLogin);
+      return;
+    }
+
+    setLocation("/");
   };
 
   return (

@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Link, useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 export function Signup() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -19,19 +21,31 @@ export function Signup() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (cleanUsername.length < 3) {
-      alert("Username must be at least 3 characters.");
+      toast({
+        variant: "destructive",
+        title: "Invalid username",
+        description: "Username must be at least 3 characters.",
+      });
       setLoading(false);
       return;
     }
 
     if (!/^[a-z0-9_]+$/.test(cleanUsername)) {
-      alert("Username can only contain letters, numbers, and underscores.");
+      toast({
+        variant: "destructive",
+        title: "Invalid username",
+        description: "Use only letters, numbers, and underscores.",
+      });
       setLoading(false);
       return;
     }
 
     if (password.length < 6) {
-      alert("Password must be at least 6 characters.");
+      toast({
+        variant: "destructive",
+        title: "Password too short",
+        description: "Password must be at least 6 characters.",
+      });
       setLoading(false);
       return;
     }
@@ -43,13 +57,21 @@ export function Signup() {
 
     if (usernameCheckError) {
       console.error(usernameCheckError);
-      alert("Could not check username. Please try again.");
+      toast({
+        variant: "destructive",
+        title: "Signup failed",
+        description: "Could not check username. Please try again.",
+      });
       setLoading(false);
       return;
     }
 
     if (existingEmail) {
-      alert("Username already used. Choose another one.");
+      toast({
+        variant: "destructive",
+        title: "Username already used",
+        description: "Choose another username.",
+      });
       setLoading(false);
       return;
     }
@@ -65,7 +87,11 @@ export function Signup() {
     });
 
     if (error) {
-      alert(error.message);
+      toast({
+        variant: "destructive",
+        title: "Signup failed",
+        description: error.message,
+      });
       setLoading(false);
       return;
     }
@@ -84,7 +110,11 @@ export function Signup() {
           profileError.message.toLowerCase().includes("duplicate") ||
           profileError.message.toLowerCase().includes("unique")
         ) {
-          alert("Username already used. Choose another one.");
+          toast({
+            variant: "destructive",
+            title: "Username already used",
+            description: "Choose another username.",
+          });
           setLoading(false);
           return;
         }
@@ -94,11 +124,19 @@ export function Signup() {
     setLoading(false);
 
     if (data.session) {
+      toast({
+        title: "Account created",
+        description: "Welcome to Roavooo.",
+      });
       setLocation("/favorites");
       return;
     }
 
-    alert("Account created. Please log in.");
+    toast({
+      title: "Account created",
+      description: "Please log in to continue.",
+    });
+
     setLocation("/login");
   };
 

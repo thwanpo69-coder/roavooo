@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { X, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useLocation } from "wouter";
 
 type Trip = {
   id: string;
@@ -59,25 +58,19 @@ export function SaveToTripModal({
 
       const { data: userData, error: userError } = await supabase.auth.getUser();
 
-      if (userError) {
-        console.error("Failed to get user:", userError);
-        toast({
-          variant: "destructive",
-          title: t.saveToTrip.couldNotGetUser,
-        });
-        setLoadingTrips(false);
-        onClose();
-        return;
-      }
+      if (userError || !userData.user) {
+        localStorage.setItem(
+          "redirectAfterLogin",
+          `${window.location.pathname}${window.location.search}`
+        );
 
-      const user = userData.user;
-
-      if (!user) {
         setLoadingTrips(false);
         onClose();
         setLocation("/login");
         return;
       }
+
+      const user = userData.user;
 
       if (!placeId) {
         toast({
@@ -147,7 +140,7 @@ export function SaveToTripModal({
     };
 
     fetchUserTrips();
-  }, [isOpen, placeId, onClose, toast, t.saveToTrip]);
+  }, [isOpen, placeId, onClose, toast, t.saveToTrip, setLocation]);
 
   const handleClose = () => {
     setUserTrips([]);

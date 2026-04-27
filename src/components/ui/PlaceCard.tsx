@@ -27,12 +27,20 @@ export function PlaceCard({
     t.place.content?.[place.id as keyof typeof t.place.content];
   const description = translatedPlace?.description ?? place.description;
 
+  const saveCurrentPathAndGoLogin = () => {
+    localStorage.setItem(
+      "redirectAfterLogin",
+      `${window.location.pathname}${window.location.search}`
+    );
+    setLocation("/login");
+  };
+
   const handleSaveToTripClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (!user) {
-      setLocation("/login");
+      saveCurrentPathAndGoLogin();
       return;
     }
 
@@ -65,7 +73,7 @@ export function PlaceCard({
               e.stopPropagation();
 
               if (!user) {
-                setLocation("/login");
+                saveCurrentPathAndGoLogin();
                 return;
               }
 
