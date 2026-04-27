@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { X, Check } from "lucide-react";
+import { X, Check, Loader2, FolderPlus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -143,6 +143,8 @@ export function SaveToTripModal({
   }, [isOpen, placeId, onClose, toast, t.saveToTrip, setLocation]);
 
   const handleClose = () => {
+    if (savingToTrip) return;
+
     setUserTrips([]);
     setSavingToTrip(false);
     setSelectedTripId(null);
@@ -155,6 +157,7 @@ export function SaveToTripModal({
   const handleSaveToTrip = async (tripId: string) => {
     if (!placeId) return;
     if (tripPlaceMap[tripId]) return;
+    if (savingToTrip) return;
 
     setSavingToTrip(true);
     setSelectedTripId(tripId);
@@ -187,6 +190,7 @@ export function SaveToTripModal({
       }
 
       setSavingToTrip(false);
+      setSelectedTripId(null);
       return;
     }
 
@@ -209,23 +213,31 @@ export function SaveToTripModal({
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       <button
         type="button"
-        className="absolute inset-0 bg-black/50"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={handleClose}
+        disabled={savingToTrip}
+        aria-label="Close modal"
       />
 
       <div className="relative z-10 w-full max-w-md rounded-3xl border border-border bg-card shadow-2xl p-5 md:p-6">
         <div className="flex items-start justify-between gap-4 mb-5">
           <div>
-            <h3 className="text-xl font-semibold">{t.saveToTrip.title}</h3>
+            <div className="flex items-center gap-2">
+              <FolderPlus className="w-5 h-5 text-primary" />
+              <h3 className="text-xl font-semibold">{t.saveToTrip.title}</h3>
+            </div>
 
             {placeName && (
-              <p className="text-sm text-muted-foreground mt-1">{placeName}</p>
+              <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
+                {placeName}
+              </p>
             )}
           </div>
 
           <button
             onClick={handleClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            disabled={savingToTrip}
+            className="text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             type="button"
           >
             <X className="w-5 h-5" />
@@ -233,52 +245,58 @@ export function SaveToTripModal({
         </div>
 
         {loadingTrips ? (
-          <p className="text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
+            <Loader2 className="w-4 h-4 animate-spin" />
             {t.saveToTrip.loadingTrips}
-          </p>
+          </div>
         ) : hasNoTrips ? (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-border bg-background p-4">
+            <p className="text-sm text-muted-foreground mb-3">
               {t.saveToTrip.noTrips}
             </p>
 
             <Link
               href="/trips"
               onClick={handleClose}
-              className="inline-flex text-sm font-medium text-primary hover:opacity-80"
+              className="inline-flex text-sm font-semibold text-primary hover:opacity-80"
             >
-              {t.saveToTrip.goToTrips}
+              {t.saveToTrip.goToTrips} →
             </Link>
           </div>
         ) : (
           <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
             {userTrips.map((trip) => {
               const alreadyAdded = tripPlaceMap[trip.id];
+              const isSavingThisTrip =
+                savingToTrip && selectedTripId === trip.id;
 
               return (
                 <button
                   key={trip.id}
                   onClick={() => !alreadyAdded && handleSaveToTrip(trip.id)}
                   disabled={savingToTrip || alreadyAdded}
-                  className={`w-full text-left px-4 py-3 rounded-xl border transition-colors disabled:opacity-60 ${
+                  className={`w-full text-left px-4 py-3 rounded-xl border transition-all disabled:opacity-70 ${
                     alreadyAdded
                       ? "border-border bg-muted text-muted-foreground cursor-not-allowed"
-                      : selectedTripId === trip.id
+                      : isSavingThisTrip
                       ? "border-primary bg-primary/10"
-                      : "border-border hover:bg-muted"
+                      : "border-border hover:bg-muted active:scale-[0.99]"
                   }`}
                   type="button"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span>{trip.title}</span>
+                    <span className="font-medium line-clamp-1">
+                      {trip.title}
+                    </span>
 
                     {alreadyAdded ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
+                      <span className="inline-flex items-center gap-1 text-xs text-primary font-medium shrink-0">
                         <Check className="w-3.5 h-3.5" />
                         {t.saveToTrip.alreadyAdded}
                       </span>
-                    ) : savingToTrip && selectedTripId === trip.id ? (
-                      <span className="text-xs text-muted-foreground">
+                    ) : isSavingThisTrip ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         {t.saveToTrip.saving}
                       </span>
                     ) : null}

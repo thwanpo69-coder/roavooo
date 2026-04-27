@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFavorites } from "@/hooks/use-favorites";
 import { PlaceCard } from "@/components/ui/PlaceCard";
-import { Heart } from "lucide-react";
+import { Heart, Loader2, Lock } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -60,48 +60,60 @@ export function Favorites() {
     loadPlaces();
   }, [favorites, user, favoritesLoading]);
 
-  const mappedPlaces = places.map((place) => ({
-    id: place.id,
-    cityId: place.city_id,
-    name: place.name,
-    category: place.category,
-    description: lang === "fr" ? place.description_fr : place.description_en,
-    imageUrl: place.image_url,
-    location: place.location ?? undefined,
-    rating: place.rating,
-    pricePerNight: place.price_per_night ?? undefined,
-    priceRange: place.price_range ?? undefined,
-    cuisine: place.cuisine ?? undefined,
-  }));
+  const mappedPlaces = useMemo(() => {
+    return places.map((place) => ({
+      id: place.id,
+      cityId: place.city_id,
+      name: place.name,
+      category: place.category,
+      description: lang === "fr" ? place.description_fr : place.description_en,
+      imageUrl: place.image_url,
+      location: place.location ?? undefined,
+      rating: place.rating,
+      pricePerNight: place.price_per_night ?? undefined,
+      priceRange: place.price_range ?? undefined,
+      cuisine: place.cuisine ?? undefined,
+    }));
+  }, [places, lang]);
 
   if (favoritesLoading) {
     return (
-      <div className="min-h-[70vh] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h1 className="text-4xl font-serif font-bold mb-4">
-          {t.favorites.title}
-        </h1>
-        <p className="text-muted-foreground">{t.favorites.subtitle}</p>
+      <div className="min-h-[70vh] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 flex items-center justify-center">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>{t.trips.loading}</span>
+        </div>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-[70vh] max-w-7xl mx-auto px-4 py-16 text-center">
-        <h1 className="text-4xl font-serif font-bold mb-4">
-          {t.favorites.title}
-        </h1>
+      <div className="min-h-[70vh] max-w-4xl mx-auto px-4 py-16 flex items-center justify-center">
+        <div className="w-full rounded-3xl border border-border bg-card p-8 md:p-10 text-center shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-5">
+            <Lock className="w-8 h-8 text-primary" />
+          </div>
 
-        <p className="text-muted-foreground mb-6">{t.profile.subtitle}</p>
+          <h1 className="text-3xl md:text-4xl font-serif font-bold mb-3">
+            {t.favorites.title}
+          </h1>
 
-        <div className="flex justify-center gap-3">
-          <Link href="/login">
-            <Button>{t.profile.logIn}</Button>
-          </Link>
+          <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+            {t.profile.subtitle}
+          </p>
 
-          <Link href="/signup">
-            <Button variant="outline">{t.profile.signUp}</Button>
-          </Link>
+          <div className="flex justify-center gap-3">
+            <Link href="/login">
+              <Button className="rounded-xl px-5 py-3">{t.profile.logIn}</Button>
+            </Link>
+
+            <Link href="/signup">
+              <Button variant="outline" className="rounded-xl px-5 py-3">
+                {t.profile.signUp}
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -109,11 +121,20 @@ export function Favorites() {
 
   if (loadingPlaces) {
     return (
-      <div className="min-h-[70vh] max-w-7xl mx-auto px-4 py-16">
-        <h1 className="text-4xl font-serif font-bold mb-4">
-          {t.favorites.title}
-        </h1>
-        <p className="text-muted-foreground">{t.trips.loading}</p>
+      <div className="min-h-[70vh] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="mb-12">
+          <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-4">
+            {t.favorites.title}
+          </h1>
+          <p className="text-xl text-muted-foreground">
+            {t.favorites.subtitle}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>{t.trips.loading}</span>
+        </div>
       </div>
     );
   }
@@ -128,19 +149,23 @@ export function Favorites() {
       </div>
 
       {mappedPlaces.length === 0 ? (
-        <div className="text-center py-20">
-          <Heart className="mx-auto mb-4 w-10 h-10 text-muted-foreground" />
+        <div className="rounded-3xl border border-border bg-card p-8 md:p-10 text-center shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-5">
+            <Heart className="w-8 h-8 text-primary" />
+          </div>
 
-          <h2 className="text-xl font-semibold mb-2">
+          <h2 className="text-2xl font-serif font-bold mb-2">
             {t.favorites.emptyTitle}
           </h2>
 
-          <p className="text-muted-foreground mb-6">
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
             {t.favorites.emptyMessage}
           </p>
 
           <Link href="/search">
-            <Button>{t.favorites.emptyCta}</Button>
+            <Button className="rounded-xl px-5 py-3">
+              {t.favorites.emptyCta}
+            </Button>
           </Link>
         </div>
       ) : (

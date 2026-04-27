@@ -6,6 +6,9 @@ import {
   Plus,
   FolderOpen,
   Image as ImageIcon,
+  Loader2,
+  Plane,
+  Lock,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -181,6 +184,8 @@ export function Trips() {
   };
 
   const handleCreateTrip = async () => {
+    if (creating) return;
+
     const cleanTitle = title.trim();
     const cleanNotes = notes.trim();
 
@@ -206,20 +211,7 @@ export function Trips() {
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
 
-    if (userError) {
-      console.error("Error fetching user:", userError);
-      toast({
-        variant: "destructive",
-        title: t.trips.toasts.getUserTitle,
-        description: t.trips.toasts.getUserDescription,
-      });
-      setCreating(false);
-      return;
-    }
-
-    const user = userData.user;
-
-    if (!user) {
+    if (userError || !userData.user) {
       toast({
         variant: "destructive",
         title: t.trips.toasts.loginRequiredTitle,
@@ -230,7 +222,7 @@ export function Trips() {
     }
 
     const { error } = await supabase.from("trips").insert({
-      user_id: user.id,
+      user_id: userData.user.id,
       title: cleanTitle,
       city_id: cityId || null,
       start_date: startDate || null,
@@ -251,45 +243,55 @@ export function Trips() {
 
     resetForm();
     await fetchTrips();
-    setCreating(false);
 
     toast({
       title: t.trips.toasts.createSuccessTitle,
       description: t.trips.toasts.createSuccessDescription,
     });
+
+    setCreating(false);
   };
 
   if (!authChecked || loading) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
-        {t.trips.loading || "Loading..."}
+      <div className="min-h-[70vh] p-6 max-w-6xl mx-auto flex items-center justify-center">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>{t.trips.loading || "Loading..."}</span>
+        </div>
       </div>
     );
   }
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-[70vh] max-w-7xl mx-auto px-4 py-16 text-center">
-        <h1 className="text-4xl font-serif font-bold mb-4">
-          {t.trips.title}
-        </h1>
+      <div className="min-h-[70vh] max-w-4xl mx-auto px-4 py-16 flex items-center justify-center">
+        <div className="w-full rounded-3xl border border-border bg-card p-8 md:p-10 text-center shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-5">
+            <Lock className="w-8 h-8 text-primary" />
+          </div>
 
-        <p className="text-muted-foreground mb-6">
-          {t.profile.subtitle}
-        </p>
+          <h1 className="text-3xl md:text-4xl font-serif font-bold mb-3">
+            {t.trips.title}
+          </h1>
 
-        <div className="flex justify-center gap-3">
-          <Link href="/login">
-            <button className="px-5 py-3 bg-primary text-white rounded-lg font-semibold hover:opacity-90 transition-opacity">
-              {t.profile.logIn}
-            </button>
-          </Link>
+          <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+            {t.profile.subtitle}
+          </p>
 
-          <Link href="/signup">
-            <button className="px-5 py-3 border border-border rounded-lg font-semibold hover:bg-muted transition-colors">
-              {t.profile.signUp}
-            </button>
-          </Link>
+          <div className="flex justify-center gap-3">
+            <Link href="/login">
+              <button className="px-5 py-3 bg-primary text-white rounded-xl font-semibold hover:opacity-90 active:scale-[0.98] transition-all">
+                {t.profile.logIn}
+              </button>
+            </Link>
+
+            <Link href="/signup">
+              <button className="px-5 py-3 border border-border rounded-xl font-semibold hover:bg-muted active:scale-[0.98] transition-all">
+                {t.profile.signUp}
+              </button>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -303,12 +305,22 @@ export function Trips() {
       </div>
 
       {trips.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-card p-8 mb-8 text-center">
-          <h2 className="text-xl font-semibold mb-2">{t.trips.emptyTitle}</h2>
-          <p className="text-muted-foreground mb-5">{t.trips.emptyMessage}</p>
+        <div className="rounded-3xl border border-border bg-card p-8 md:p-10 mb-8 text-center shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-5">
+            <Plane className="w-8 h-8 text-primary" />
+          </div>
+
+          <h2 className="text-2xl font-serif font-bold mb-2">
+            {t.trips.emptyTitle}
+          </h2>
+
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            {t.trips.emptyMessage}
+          </p>
+
           <Link
             href="/search"
-            className="inline-flex text-sm font-medium text-primary hover:opacity-80"
+            className="inline-flex items-center justify-center rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 active:scale-[0.98] transition-all"
           >
             {t.trips.explorePlaces} →
           </Link>
@@ -323,10 +335,11 @@ export function Trips() {
             const formattedEndDate = formatDate(trip.end_date);
 
             return (
-              <div
+              <button
                 key={trip.id}
                 onClick={() => setLocation(`/trips/${trip.id}`)}
-                className="rounded-3xl overflow-hidden border border-border bg-card cursor-pointer hover:translate-y-[-2px] hover:shadow-xl transition-all"
+                className="text-left rounded-3xl overflow-hidden border border-border bg-card cursor-pointer hover:translate-y-[-2px] hover:shadow-xl active:scale-[0.99] transition-all"
+                type="button"
               >
                 <div className="relative h-56 bg-muted">
                   {coverImage ? (
@@ -344,7 +357,7 @@ export function Trips() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
                   <div className="absolute bottom-4 left-4 right-4">
-                    <h2 className="text-2xl font-semibold text-white mb-2">
+                    <h2 className="text-2xl font-semibold text-white mb-2 line-clamp-1">
                       {trip.title}
                     </h2>
 
@@ -400,13 +413,13 @@ export function Trips() {
                     </span>
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
       )}
 
-      <div className="rounded-3xl border border-border bg-card p-5 md:p-6">
+      <div className="rounded-3xl border border-border bg-card p-5 md:p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-5">
           <Plus className="w-5 h-5 text-primary" />
           <h2 className="text-xl font-semibold">{t.trips.createNewTrip}</h2>
@@ -418,13 +431,15 @@ export function Trips() {
             placeholder={t.trips.tripTitlePlaceholder}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="p-3 rounded-lg bg-muted border border-border outline-none"
+            disabled={creating}
+            className="p-3 rounded-lg bg-muted border border-border outline-none disabled:opacity-60"
           />
 
           <select
             value={cityId}
             onChange={(e) => setCityId(e.target.value)}
-            className="p-3 rounded-lg bg-muted border border-border outline-none"
+            disabled={creating}
+            className="p-3 rounded-lg bg-muted border border-border outline-none disabled:opacity-60"
           >
             <option value="">{t.trips.selectCity}</option>
             {cities.map((city) => (
@@ -438,14 +453,16 @@ export function Trips() {
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="p-3 rounded-lg bg-muted border border-border outline-none"
+            disabled={creating}
+            className="p-3 rounded-lg bg-muted border border-border outline-none disabled:opacity-60"
           />
 
           <input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="p-3 rounded-lg bg-muted border border-border outline-none"
+            disabled={creating}
+            className="p-3 rounded-lg bg-muted border border-border outline-none disabled:opacity-60"
           />
         </div>
 
@@ -453,15 +470,18 @@ export function Trips() {
           placeholder={t.trips.tripNotesPlaceholder}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
+          disabled={creating}
           rows={4}
-          className="w-full p-3 rounded-lg bg-muted border border-border outline-none resize-none mb-4"
+          className="w-full p-3 rounded-lg bg-muted border border-border outline-none resize-none mb-4 disabled:opacity-60"
         />
 
         <button
           onClick={handleCreateTrip}
           disabled={creating}
-          className="px-5 py-3 bg-primary text-white rounded-lg font-semibold hover:opacity-90 disabled:opacity-60"
+          className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-primary text-white rounded-xl font-semibold hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all"
+          type="button"
         >
+          {creating && <Loader2 className="w-4 h-4 animate-spin" />}
           {creating ? t.trips.creating : t.trips.createNewTrip}
         </button>
       </div>

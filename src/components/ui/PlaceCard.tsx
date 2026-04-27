@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Heart, MapPin, Star, FolderPlus } from "lucide-react";
+import { Heart, MapPin, Star, FolderPlus, Loader2 } from "lucide-react";
 import { Place } from "@/lib/data";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -21,6 +21,7 @@ export function PlaceCard({
 
   const isFav = isFavorite(place.id);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
 
   const categoryLabel = t.card.category[place.category] ?? place.category;
   const translatedPlace =
@@ -33,6 +34,24 @@ export function PlaceCard({
       `${window.location.pathname}${window.location.search}`
     );
     setLocation("/login");
+  };
+
+  const handleFavoriteClick = async (
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user) {
+      saveCurrentPathAndGoLogin();
+      return;
+    }
+
+    if (favoriteBusy || loading) return;
+
+    setFavoriteBusy(true);
+    await toggleFavorite(place.id);
+    setFavoriteBusy(false);
   };
 
   const handleSaveToTripClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -68,33 +87,31 @@ export function PlaceCard({
           </div>
 
           <button
-            onClick={async (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-
-              if (!user) {
-                saveCurrentPathAndGoLogin();
-                return;
-              }
-
-              await toggleFavorite(place.id);
-            }}
-            disabled={loading}
+            onClick={handleFavoriteClick}
+            disabled={loading || favoriteBusy}
             className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all duration-200 z-10 ${
               isFav
                 ? "bg-primary/20 border border-primary/40"
                 : "bg-black/40 border border-white/20 hover:bg-black/60"
-            } ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
+            } ${
+              loading || favoriteBusy
+                ? "opacity-60 cursor-not-allowed"
+                : "active:scale-95"
+            }`}
             aria-label={
               isFav ? t.card.removeFromFavorites : t.card.addToFavorites
             }
             type="button"
           >
-            <Heart
-              className={`w-4 h-4 transition-colors ${
-                isFav ? "fill-primary text-primary" : "text-white"
-              }`}
-            />
+            {favoriteBusy ? (
+              <Loader2 className="w-4 h-4 animate-spin text-white" />
+            ) : (
+              <Heart
+                className={`w-4 h-4 transition-colors ${
+                  isFav ? "fill-primary text-primary" : "text-white"
+                }`}
+              />
+            )}
           </button>
         </div>
 
@@ -160,7 +177,7 @@ export function PlaceCard({
               <button
                 type="button"
                 onClick={handleSaveToTripClick}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted active:scale-[0.98] transition-all"
               >
                 <FolderPlus className="w-4 h-4" />
                 {t.card.saveToTrip}
