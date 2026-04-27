@@ -4,16 +4,44 @@ import { Link, useLocation } from "wouter";
 
 export function Login() {
   const [, setLocation] = useLocation();
-  const [email, setEmail] = useState("");
+
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
+    const cleanIdentifier = identifier.trim().toLowerCase();
+
+    let loginEmail = cleanIdentifier;
+
+    if (!cleanIdentifier.includes("@")) {
+      const { data: emailFromUsername, error: usernameError } =
+        await supabase.rpc("get_email_by_username", {
+          input_username: cleanIdentifier,
+        });
+
+      if (usernameError) {
+        console.error(usernameError);
+        alert("Could not check username. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      if (!emailFromUsername) {
+        alert("Username not found.");
+        setLoading(false);
+        return;
+      }
+
+      loginEmail = emailFromUsername;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: loginEmail,
       password,
     });
 
@@ -42,18 +70,18 @@ export function Login() {
         </p>
 
         <input
-          type="email"
-          placeholder="Email"
-          className="w-full p-3 rounded-lg bg-muted"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="text"
+          placeholder="Username or email"
+          className="w-full p-3 rounded-lg bg-muted border border-border outline-none"
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
           required
         />
 
         <input
           type="password"
           placeholder="Password"
-          className="w-full p-3 rounded-lg bg-muted"
+          className="w-full p-3 rounded-lg bg-muted border border-border outline-none"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -62,9 +90,9 @@ export function Login() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-primary text-white p-3 rounded-lg font-semibold"
+          className="w-full bg-primary text-white p-3 rounded-lg font-semibold disabled:opacity-60"
         >
-          {loading ? "Loading..." : "Log in"}
+          {loading ? "Logging in..." : "Log in"}
         </button>
 
         <p className="text-sm text-muted-foreground text-center">
