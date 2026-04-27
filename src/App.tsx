@@ -25,7 +25,7 @@ import { Trips } from "@/pages/Trips";
 import { TripDetails } from "@/pages/TripDetails";
 import { Profile } from "@/pages/Profile";
 import { Cities } from "@/pages/Cities";
-import { Recent } from "@/pages/Recent";
+import { Recent } from "@/pages/RecentPage";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
