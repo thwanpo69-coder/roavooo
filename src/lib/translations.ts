@@ -1,3 +1,5 @@
+import { ViewTransitionBuilder } from "framer-motion";
+
 export type Lang = "en" | "fr";
 
 const en = {
@@ -57,6 +59,7 @@ const en = {
       title: "Unforgettable Experiences",
       subtitle: "Hammams, souk tours, cooking classes, and desert adventures.",
       viewAll: "View all",
+      ViewAllMobile: "View all experiences",
     },
     dining: {
       eyebrow: "Where to Eat",
@@ -465,6 +468,7 @@ const fr: typeof en = {
       subtitle:
         "Hammams, visites des souks, cours de cuisine et aventures dans le désert.",
       viewAll: "Voir tout",
+      ViewAllMobile: "Voir toutes les expériences",
     },
     dining: {
       eyebrow: "Où Manger",

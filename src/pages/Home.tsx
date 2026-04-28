@@ -580,6 +580,17 @@ export function Home() {
             </p>
           </div>
         )}
+
+        <div className="mt-8 text-center md:hidden">
+          <Link
+            href="/search?category=activity"
+            className="inline-flex items-center gap-2 text-sm text-primary font-semibold border border-primary/40 px-6 py-3 rounded-full hover:bg-primary/5 transition-colors"
+          >
+            {t.home.experiences.ViewAllMobile} <ArrowRight className="w-4 h-4" />
+          </Link>
+
+
+        </div>
       </section>
 
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-card/40 border-y border-border/40">
