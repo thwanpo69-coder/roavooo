@@ -171,15 +171,37 @@ export function Home() {
     },
   ];
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
+const handleSearch = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    const params = new URLSearchParams();
-    if (searchQuery.trim()) params.set("q", searchQuery.trim());
-    params.set("category", activeCategory);
+  const cleanQuery = searchQuery.trim();
 
-    setLocation(`/search?${params.toString()}`);
-  };
+  const params = new URLSearchParams();
+  if (cleanQuery) params.set("q", cleanQuery);
+  params.set("category", activeCategory);
+
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+
+    const { error } = await supabase.from("user_events").insert({
+      user_id: userData.user?.id || null,
+      event_type: "search",
+      metadata: {
+        query: cleanQuery,
+        category: activeCategory,
+        source: "home_hero",
+      },
+    });
+
+    if (error) {
+      console.error("Search tracking failed:", error);
+    }
+  } catch (error) {
+    console.error("Search tracking crashed:", error);
+  }
+
+  setLocation(`/search?${params.toString()}`);
+};
 
   const mapPlace = (place: DbPlace) => ({
     id: place.id,

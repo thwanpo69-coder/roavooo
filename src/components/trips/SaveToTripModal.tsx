@@ -199,6 +199,20 @@ export function SaveToTripModal({
       [tripId]: true,
     }));
 
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+
+    if (user) {
+      await supabase.from("user_events").insert({
+        user_id: user.id,
+        event_type: "save_to_trip",
+        metadata: {
+          place_id: placeId,
+          trip_id: tripId,
+        },
+      });
+    }
+
     toast({
       title: t.saveToTrip.success,
     });

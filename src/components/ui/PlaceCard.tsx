@@ -5,6 +5,7 @@ import { Place } from "@/lib/data";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { SaveToTripModal } from "@/components/trips/SaveToTripModal";
+import { supabase } from "@/lib/supabase";
 
 interface PlaceCardProps {
   place: Place;
@@ -27,6 +28,31 @@ export function PlaceCard({
   const translatedPlace =
     t.place.content?.[place.id as keyof typeof t.place.content];
   const description = translatedPlace?.description ?? place.description;
+
+  const trackPlaceClick = async () => {
+    try {
+      await supabase.from("user_events").insert({
+        user_id: user?.id || null,
+        event_type: "place_click",
+        metadata: {
+          place_id: place.id,
+          place_name: place.name,
+          category: place.category,
+          city_id: place.cityId,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to track place click:", error);
+    }
+  };
+
+  const handleGoToPlace = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    trackPlaceClick();
+    setLocation(`/place/${place.id}`);
+  };
 
   const saveCurrentPathAndGoLogin = () => {
     localStorage.setItem(
@@ -70,7 +96,11 @@ export function PlaceCard({
     <>
       <div className="group flex flex-col h-full rounded-2xl overflow-hidden bg-card border border-border/50 hover:border-border hover:-translate-y-1 hover:shadow-2xl transition-all duration-300">
         <div className="relative aspect-[4/3] overflow-hidden shrink-0">
-          <Link href={`/place/${place.id}`} className="block w-full h-full">
+          <Link
+            href={`/place/${place.id}`}
+            onClick={handleGoToPlace}
+            className="block w-full h-full"
+          >
             <img
               src={place.imageUrl}
               alt={place.name}
@@ -117,7 +147,11 @@ export function PlaceCard({
 
         <div className="flex flex-col flex-grow p-5">
           <div className="flex items-start justify-between gap-3 mb-2">
-            <Link href={`/place/${place.id}`} className="flex-1 min-w-0">
+            <Link
+              href={`/place/${place.id}`}
+              onClick={handleGoToPlace}
+              className="flex-1 min-w-0"
+            >
               <h3 className="font-serif text-lg font-bold text-foreground group-hover:text-primary transition-colors duration-200 line-clamp-1 leading-snug">
                 {place.name}
               </h3>
@@ -167,6 +201,7 @@ export function PlaceCard({
 
               <Link
                 href={`/place/${place.id}`}
+                onClick={handleGoToPlace}
                 className="text-xs font-semibold text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
               >
                 {t.card.details} <span aria-hidden>→</span>

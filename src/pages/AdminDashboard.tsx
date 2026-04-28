@@ -35,15 +35,36 @@ type DbCity = {
   tip_transport_en: string;
   tip_transport_fr: string;
   tip_phrases_en: string;
-  tip_phrases_fr: string;
+};
+
+type AnalyticsRow = {
+  label: string;
+  count: number;
+};
+
+type UserEvent = {
+  event_type: string;
+  metadata: Record<string, any> | null;
 };
 
 export function AdminDashboard() {
   const [, setLocation] = useLocation();
+
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"places" | "cities">("places");
+  const [activeTab, setActiveTab] = useState<
+    "places" | "cities" | "analytics"
+  >("places");
+
   const [places, setPlaces] = useState<DbPlace[]>([]);
   const [cities, setCities] = useState<DbCity[]>([]);
+
+  const [mostClickedPlaces, setMostClickedPlaces] = useState<AnalyticsRow[]>(
+    []
+  );
+  const [mostSearchedTerms, setMostSearchedTerms] = useState<AnalyticsRow[]>(
+    []
+  );
+  const [mostSavedPlaces, setMostSavedPlaces] = useState<AnalyticsRow[]>([]);
 
   const loadPlaces = async () => {
     const { data, error } = await supabase
@@ -73,6 +94,48 @@ export function AdminDashboard() {
     setCities((data as DbCity[]) || []);
   };
 
+  const loadAnalytics = async () => {
+    const { data, error } = await supabase
+      .from("user_events")
+      .select("event_type, metadata");
+
+    if (error) {
+      console.error("Failed to load analytics:", error);
+      return;
+    }
+
+    const events = ((data as UserEvent[]) || []);
+
+    const countBy = (
+      eventType: string,
+      metadataKeys: string[]
+    ): AnalyticsRow[] => {
+      const counts: Record<string, number> = {};
+
+      events
+        .filter((event) => event.event_type === eventType)
+        .forEach((event) => {
+          const metadata = event.metadata || {};
+
+          const value =
+            metadataKeys.map((key) => metadata[key]).find(Boolean) || null;
+
+          if (!value) return;
+
+          counts[String(value)] = (counts[String(value)] || 0) + 1;
+        });
+
+      return Object.entries(counts)
+        .map(([label, count]) => ({ label, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+    };
+
+    setMostClickedPlaces(countBy("place_click", ["place_name", "place_id"]));
+    setMostSearchedTerms(countBy("search", ["query"]));
+    setMostSavedPlaces(countBy("save_to_trip", ["place_name", "place_id"]));
+  };
+
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getUser();
@@ -82,7 +145,7 @@ export function AdminDashboard() {
         return;
       }
 
-      await Promise.all([loadPlaces(), loadCities()]);
+      await Promise.all([loadPlaces(), loadCities(), loadAnalytics()]);
       setLoading(false);
     };
 
@@ -129,8 +192,12 @@ export function AdminDashboard() {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between mb-8">
           <div>
-            <h1 className="text-4xl font-serif font-bold mb-2">Admin Dashboard</h1>
-            <p className="text-muted-foreground">Manage your Roavooo cities and places.</p>
+            <h1 className="text-4xl font-serif font-bold mb-2">
+              Admin Dashboard
+            </h1>
+            <p className="text-muted-foreground">
+              Manage your Roavooo cities, places, and user behavior.
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -156,14 +223,27 @@ export function AdminDashboard() {
               Cities
             </button>
 
-            {activeTab === "places" ? (
+            <button
+              onClick={() => setActiveTab("analytics")}
+              className={`px-4 py-2 rounded-lg font-semibold border ${
+                activeTab === "analytics"
+                  ? "bg-primary text-white border-primary"
+                  : "border-border"
+              }`}
+            >
+              Analytics
+            </button>
+
+            {activeTab === "places" && (
               <button
                 onClick={() => setLocation("/admin/places/new")}
                 className="bg-primary text-white px-4 py-2 rounded-lg font-semibold"
               >
                 New Place
               </button>
-            ) : (
+            )}
+
+            {activeTab === "cities" && (
               <button
                 onClick={() => setLocation("/admin/cities/new")}
                 className="bg-primary text-white px-4 py-2 rounded-lg font-semibold"
@@ -181,7 +261,40 @@ export function AdminDashboard() {
           </div>
         </div>
 
-        {activeTab === "places" ? (
+        {activeTab === "analytics" ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {[
+              { title: "Most clicked places", rows: mostClickedPlaces },
+              { title: "Most searched terms", rows: mostSearchedTerms },
+              { title: "Most saved places", rows: mostSavedPlaces },
+            ].map((section) => (
+              <div
+                key={section.title}
+                className="rounded-2xl border border-border bg-card p-6"
+              >
+                <h2 className="text-xl font-bold mb-4">{section.title}</h2>
+
+                {section.rows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No data yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {section.rows.map((row) => (
+                      <div
+                        key={row.label}
+                        className="flex items-center justify-between border-b border-border pb-2 text-sm"
+                      >
+                        <span className="truncate pr-4">{row.label}</span>
+                        <span className="font-bold text-primary">
+                          {row.count}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : activeTab === "places" ? (
           <div className="rounded-2xl border border-border bg-card overflow-hidden">
             <div className="grid grid-cols-6 gap-4 px-6 py-4 border-b border-border font-semibold text-sm">
               <div>Name</div>
@@ -204,7 +317,9 @@ export function AdminDashboard() {
                 <div>{place.location || "-"}</div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setLocation(`/admin/places/${place.id}/edit`)}
+                    onClick={() =>
+                      setLocation(`/admin/places/${place.id}/edit`)
+                    }
                     className="px-3 py-1 rounded-md border border-border"
                   >
                     Edit
@@ -246,7 +361,9 @@ export function AdminDashboard() {
                 <div className="truncate">{city.image_url}</div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setLocation(`/admin/cities/${city.id}/edit`)}
+                    onClick={() =>
+                      setLocation(`/admin/cities/${city.id}/edit`)
+                    }
                     className="px-3 py-1 rounded-md border border-border"
                   >
                     Edit
