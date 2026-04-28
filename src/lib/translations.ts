@@ -136,6 +136,7 @@ const en = {
   },
 
   place: {
+    back: "Back",
     backTo: "Back to",
     perNight: "/ night",
     priceRange: "Price Range",
@@ -508,6 +509,7 @@ const fr: typeof en = {
   place: {
     ...en.place,
     backTo: "Retour à",
+    back: "Retour",
     perNight: "/ nuit",
     priceRange: "Gamme de Prix",
     cuisine: "Cuisine",

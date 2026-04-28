@@ -157,12 +157,21 @@ export function Place() {
   return (
     <div className="w-full bg-background pb-24">
       <div className="max-w-7xl mx-auto px-4 py-6 flex justify-between items-center">
-        <Link
-          href={`/city/${city?.slug}`}
-          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" /> {t.place.backTo} {city?.name}
-        </Link>
+      <button
+        type="button"
+        onClick={() => {
+          if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            window.location.href = "/"; // fallback (direct access / new tab)
+          }
+        }}
+        className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        {t.place.back || "Back"}
+        
+      </button>
 
         <div className="flex gap-4">
           <Button variant="outline" size="icon" className="rounded-full">
