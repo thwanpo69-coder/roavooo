@@ -179,7 +179,7 @@ export function PlaceCard({
               <div>
                 {place.pricePerNight && (
                   <span className="font-bold text-foreground text-sm">
-                    ${place.pricePerNight}
+                    {place.pricePerNight} MAD
                     <span className="text-muted-foreground text-xs font-normal ml-1">
                       {t.card.perNight}
                     </span>

@@ -246,7 +246,7 @@ export function Place() {
               {dbPlace.price_per_night && (
                 <div>
                   <span className="text-3xl font-bold text-foreground">
-                    ${dbPlace.price_per_night}
+                    {dbPlace.price_per_night} MAD
                   </span>
                   <span className="text-muted-foreground ml-2">
                     {t.place.perNight}
